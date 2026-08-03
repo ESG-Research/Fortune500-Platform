@@ -1,0 +1,2314 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>财富世界500强 — 利润表桑基图</title>
+<script src="echarts.min.js"></script>
+<script src="income_sankey_data.js"></script>
+<script src="supply_chain_data.js"></script>
+<style>
+:root{--bg:#f0f2f5;--card:#fff;--ink:#1e293b;--muted:#64748b;--rule:#e2e8f0;--accent:#3b82f6;--green:#10b981;--red:#ef4444;--amber:#f59e0b;--purple:#a855f7;--shadow:0 1px 3px rgba(0,0,0,.06);--shadow-lg:0 4px 16px rgba(0,0,0,.08);--transition:.2s cubic-bezier(.4,0,.2,1)}
+*{margin:0;padding:0;box-sizing:border-box}
+html{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Microsoft YaHei',sans-serif;overflow:hidden;height:100%;display:flex;flex-direction:column}
+
+/* ===== Header ===== */
+.header{background:var(--card);border-bottom:1px solid var(--rule);padding:10px 20px;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-shrink:0;z-index:10;box-shadow:var(--shadow)}
+.header-left{display:flex;align-items:center;gap:10px}
+.header-left h1{font-size:17px;font-weight:700;white-space:nowrap}
+.header-left .badge{font-size:11px;background:#eef2ff;color:#4f46e5;padding:3px 10px;border-radius:20px;font-weight:600;white-space:nowrap}
+.header-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+
+.year-selector{display:flex;background:#f1f5f9;border-radius:10px;padding:3px;gap:2px}
+.year-btn{border:none;background:transparent;padding:7px 15px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;color:var(--muted);transition:var(--transition);font-family:inherit}
+.year-btn:hover{color:var(--ink);background:rgba(255,255,255,.5)}
+.year-btn.active{background:var(--card);color:var(--ink);box-shadow:var(--shadow)}
+
+.search-box{position:relative}
+.search-box input{border:1px solid var(--rule);border-radius:10px;padding:7px 12px 7px 34px;font-size:13px;width:220px;outline:none;transition:var(--transition);font-family:inherit;background:var(--card)}
+.search-box input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(59,130,246,.1);width:280px}
+.search-box .icon{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:13px;pointer-events:none}
+
+.suggestions{position:absolute;top:100%;left:0;right:0;background:var(--card);border:1px solid var(--rule);border-radius:10px;box-shadow:var(--shadow-lg);max-height:300px;overflow-y:auto;z-index:20;display:none;margin-top:4px}
+.suggestions.show{display:block}
+.suggestion-item{padding:8px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid #f1f5f9;transition:background .15s}
+.suggestion-item:hover{background:#f8f9fb}
+.suggestion-item .sug-name{font-weight:500}
+.suggestion-item .sug-meta{font-size:11px;color:var(--muted);margin-top:2px}
+
+.data-source-badge{font-size:11px;padding:3px 10px;border-radius:20px;font-weight:600;white-space:nowrap}
+.data-source-badge.real{background:#dcfce7;color:#166534}
+.data-source-badge.estimate{background:#fef3c7;color:#92400e}
+
+.legend-bar{display:flex;align-items:center;gap:14px;font-size:11px;color:var(--muted);border-left:1px solid var(--rule);padding-left:14px}
+.legend-item{display:flex;align-items:center;gap:5px}
+.legend-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0}
+
+/* ===== Main Layout ===== */
+.main{flex:1;display:flex;overflow:hidden;position:relative}
+.chart-wrap{flex:1;position:relative;transition:margin-right .35s cubic-bezier(.4,0,.2,1);padding:12px}
+.chart-wrap.panel-open{margin-right:480px}
+#sankeyChart{width:100%;height:100%}
+
+.chart-title{position:absolute;top:16px;left:28px;z-index:5;pointer-events:none}
+.chart-title h2{font-size:20px;font-weight:700;color:var(--ink);margin-bottom:3px}
+.chart-title .subtitle{font-size:13px;color:var(--muted)}
+
+.tooltip-hint{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);background:var(--card);border:1px solid var(--rule);border-radius:20px;padding:7px 16px;font-size:12px;color:var(--muted);box-shadow:var(--shadow-lg);pointer-events:none;display:flex;align-items:center;gap:8px;white-space:nowrap}
+.tooltip-hint kbd{background:#f1f5f9;padding:2px 6px;border-radius:4px;font-size:11px;border:1px solid var(--rule)}
+
+/* ===== Side Panel ===== */
+.side-panel{position:absolute;right:0;top:0;bottom:0;width:480px;background:var(--card);border-left:1px solid var(--rule);box-shadow:var(--shadow-lg);transform:translateX(100%);transition:transform .35s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column;overflow:hidden;z-index:5}
+.side-panel.open{transform:translateX(0)}
+.panel-header{padding:14px 18px;border-bottom:1px solid var(--rule);display:flex;justify-content:space-between;align-items:flex-start;flex-shrink:0}
+.panel-header h2{font-size:16px;font-weight:700;margin-bottom:2px}
+.panel-header .subtitle{font-size:12px;color:var(--muted)}
+.close-btn{border:none;background:#f1f5f9;width:28px;height:28px;border-radius:8px;cursor:pointer;font-size:14px;color:var(--muted);display:flex;align-items:center;justify-content:center;transition:var(--transition);flex-shrink:0}
+.close-btn:hover{background:#e2e8f0;color:var(--ink)}
+
+/* ===== Tabs ===== */
+.tab-bar{display:flex;border-bottom:1px solid var(--rule);flex-shrink:0;background:#f8f9fb}
+.tab-btn{flex:1;border:none;background:transparent;padding:10px 4px;cursor:pointer;font-size:12px;font-weight:600;color:var(--muted);transition:var(--transition);font-family:inherit;border-bottom:3px solid transparent;display:flex;align-items:center;justify-content:center;gap:4px}
+.tab-btn:hover{color:var(--ink);background:rgba(255,255,255,.5)}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);background:var(--card)}
+.tab-btn .tab-icon{font-size:14px}
+
+.tab-content{flex:1;overflow-y:auto;overflow-x:hidden}
+.tab-pane{display:none;padding:14px 18px}
+.tab-pane.active{display:block}
+
+/* ===== Financial Cards with Y/Y ===== */
+.fin-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.fin-card{background:#f8f9fb;border-radius:10px;padding:10px 12px;position:relative}
+.fin-card .label{font-size:10px;color:var(--muted);margin-bottom:3px;letter-spacing:.3px;display:flex;align-items:center;justify-content:space-between}
+.fin-card .value{font-size:17px;font-weight:700;line-height:1.2}
+.fin-card .value.blue{color:var(--accent)}
+.fin-card .value.green{color:var(--green)}
+.fin-card .value.red{color:var(--red)}
+.fin-card .unit{font-size:11px;font-weight:400;color:var(--muted)}
+.fin-card .yoy{font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;margin-left:4px}
+.fin-card .yoy.up{color:#166534;background:#dcfce7}
+.fin-card .yoy.down{color:#991b1b;background:#fee2e2}
+.fin-card .yoy.flat{color:var(--muted);background:#f1f5f9}
+
+/* ===== Flow Table ===== */
+.flow-table h3,.metrics h3,.insights h3,.peers h3,.trend-section h3{font-size:11px;font-weight:700;color:var(--muted);margin-bottom:8px;letter-spacing:.5px;text-transform:uppercase}
+.flow-table table{width:100%;border-collapse:collapse;font-size:12px}
+.flow-table th{text-align:left;padding:5px 8px;background:#f8f9fb;border-radius:6px;font-weight:600;color:var(--muted);font-size:11px}
+.flow-table th.num,.flow-table td.amount{text-align:right}
+.flow-table td{padding:5px 8px;border-bottom:1px solid #f1f5f9}
+.flow-table td.amount{font-weight:600;font-variant-numeric:tabular-nums}
+.flow-table tr.revenue td{color:var(--accent)}
+.flow-table tr.profit td{color:var(--green)}
+.flow-table tr.cost td{color:var(--red)}
+
+/* ===== Metrics ===== */
+.metric-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #f1f5f9;font-size:13px}
+.metric-row:last-child{border-bottom:none}
+.metric-row .ml{color:var(--muted)}
+.metric-row .mv{font-weight:600;display:flex;align-items:center;gap:4px}
+
+/* ===== Trend Chart ===== */
+.trend-section{margin-bottom:16px}
+#trendChart{width:100%;height:200px;margin-top:4px}
+.trend-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px}
+.trend-metric{text-align:center;background:#f8f9fb;border-radius:8px;padding:6px 4px}
+.trend-metric .tm-label{font-size:9px;color:var(--muted);margin-bottom:2px}
+.trend-metric .tm-value{font-size:13px;font-weight:700}
+.trend-metric .tm-change{font-size:10px;font-weight:600}
+
+/* ===== Peer Comparison ===== */
+.peer-table{width:100%;border-collapse:collapse;font-size:12px}
+.peer-table th{text-align:left;padding:5px 6px;background:#f8f9fb;border-radius:5px;font-weight:600;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.3px;position:sticky;top:0}
+.peer-table th.num{text-align:right}
+.peer-table td{padding:5px 6px;border-bottom:1px solid #f1f5f9;cursor:pointer;transition:background .15s}
+.peer-table tr:hover td{background:#f0f7ff}
+.peer-table tr.current td{background:#eef2ff;font-weight:600}
+.peer-table td.num{text-align:right;font-variant-numeric:tabular-nums}
+.peer-table .rank-badge{display:inline-block;width:22px;height:22px;line-height:22px;text-align:center;border-radius:6px;font-size:10px;font-weight:700;background:#e2e8f0;color:var(--ink)}
+.peer-table .rank-badge.top10{background:#fef3c7;color:#92400e}
+.peer-table .rank-badge.top50{background:#dbeafe;color:#1e40af}
+.peer-table .rank-badge.top100{background:#dcfce7;color:#166534}
+
+/* ===== Insights ===== */
+.insight-card{background:#f8f9fb;border-radius:10px;padding:10px 12px;margin-bottom:8px;border-left:3px solid var(--accent)}
+.insight-card.green{border-left-color:var(--green)}
+.insight-card.red{border-left-color:var(--red)}
+.insight-card.amber{border-left-color:var(--amber)}
+.insight-card.purple{border-left-color:var(--purple)}
+.insight-card .ic-title{font-size:12px;font-weight:700;margin-bottom:3px;display:flex;align-items:center;gap:4px}
+.insight-card .ic-body{font-size:12px;color:var(--muted);line-height:1.5}
+.insight-card .ic-body b{color:var(--ink)}
+
+/* ===== Data Source ===== */
+.data-source-row{margin-top:10px;padding-top:8px;border-top:2px solid var(--rule);font-size:11px;color:var(--muted);display:flex;justify-content:space-between;align-items:center}
+
+/* ===== No Data ===== */
+.no-data{display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted);font-size:15px;text-align:center}
+.no-data .icon{font-size:48px;margin-bottom:12px;opacity:.3}
+
+/* ===== Scrollbar ===== */
+.tab-content::-webkit-scrollbar{width:6px}
+.tab-content::-webkit-scrollbar-track{background:transparent}
+.tab-content::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px}
+.tab-content::-webkit-scrollbar-thumb:hover{background:#94a3b8}
+
+/* ===== Supply Chain Tab ===== */
+.sc-section{margin-bottom:16px}
+.sc-section h3{font-size:11px;font-weight:700;color:var(--muted);margin-bottom:8px;letter-spacing:.5px;text-transform:uppercase}
+.sc-desc{font-size:13px;color:var(--ink);line-height:1.6;background:#f8f9fb;border-radius:10px;padding:12px 14px;margin-bottom:14px}
+.sc-product-tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.sc-tag{font-size:12px;padding:4px 10px;border-radius:8px;font-weight:500;background:#eef2ff;color:#4f46e5}
+.sc-tag.service{background:#dbeafe;color:#1e40af}
+.sc-tag.brand{background:#f3e8ff;color:#6b21a8}
+.sc-chain{display:flex;flex-direction:column;gap:0}
+.sc-chain-row{display:flex;align-items:flex-start;gap:10px;padding:12px 0;border-bottom:1px solid #f1f5f9}
+.sc-chain-row:last-child{border-bottom:none}
+.sc-chain-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.sc-chain-icon.up{background:#dbeafe;color:#1e40af}
+.sc-chain-icon.down{background:#dcfce7;color:#166534}
+.sc-chain-icon.mid{background:#eef2ff;color:#4f46e5}
+.sc-chain-content{flex:1;min-width:0}
+.sc-chain-label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;margin-bottom:2px}
+.sc-chain-text{font-size:13px;color:var(--ink);line-height:1.4}
+.sc-bottleneck-list{display:flex;flex-direction:column;gap:8px}
+.sc-bottleneck{background:#f8f9fb;border-radius:10px;padding:10px 12px;border-left:3px solid var(--amber);display:flex;align-items:flex-start;gap:10px}
+.sc-bottleneck.severity-high{border-left-color:var(--red)}
+.sc-bottleneck.severity-medium{border-left-color:var(--amber)}
+.sc-bottleneck-icon{font-size:18px;flex-shrink:0;margin-top:1px}
+.sc-bottleneck-body{flex:1}
+.sc-bottleneck-title{font-size:13px;font-weight:700;margin-bottom:2px;display:flex;align-items:center;gap:6px}
+.sc-bottleneck-desc{font-size:12px;color:var(--muted);line-height:1.4}
+.sc-severity-badge{font-size:9px;padding:2px 6px;border-radius:6px;font-weight:700;text-transform:uppercase;letter-spacing:.3px}
+.sc-severity-badge.high{background:#fee2e2;color:#991b1b}
+.sc-severity-badge.medium{background:#fef3c7;color:#92400e}
+.sc-suppliers{font-size:12px;color:var(--muted);background:#f8f9fb;border-radius:8px;padding:8px 12px;line-height:1.5}
+.sc-sub-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.sc-sub-tag{font-size:11px;padding:2px 8px;border-radius:6px;background:#f1f5f9;color:var(--ink)}
+
+/* ===== Supply Chain Info Bar ===== */
+.sc-info-bar{position:absolute;bottom:16px;left:16px;right:16px;background:var(--card);border:1px solid var(--rule);border-radius:12px;padding:10px 16px;box-shadow:var(--shadow-lg);display:none;z-index:4}
+.sc-info-bar.show{display:block}
+.sc-info-grid{display:flex;gap:18px;flex-wrap:wrap;align-items:center}
+.sc-info-item{display:flex;flex-direction:column;gap:1px}
+.sc-info-label{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px}
+.sc-info-value{font-size:14px;font-weight:700;color:var(--ink)}
+.sc-info-value .unit{font-size:10px;font-weight:400;color:var(--muted)}
+.sc-info-sep{width:1px;height:28px;background:var(--rule)}
+.sc-info-risk{display:flex;gap:6px;align-items:center}
+.sc-risk-badge{font-size:11px;padding:2px 8px;border-radius:6px;font-weight:700}
+.sc-risk-badge.high{background:#fee2e2;color:#991b1b}
+.sc-risk-badge.medium{background:#fef3c7;color:#92400e}
+.sc-info-desc{font-size:11px;color:var(--muted);line-height:1.5;margin-top:6px;padding-top:6px;border-top:1px solid var(--rule);max-height:40px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+
+/* ===== SC Toolbar ===== */
+.sc-toolbar{position:absolute;top:16px;right:28px;z-index:5;display:none;gap:8px;align-items:center}
+.sc-toolbar.show{display:flex}
+.sc-search-box{position:relative}
+.sc-search-box input{border:1px solid var(--rule);border-radius:8px;padding:5px 10px 5px 28px;font-size:12px;width:160px;outline:none;transition:var(--transition);font-family:inherit;background:var(--card)}
+.sc-search-box input:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(59,130,246,.1);width:200px}
+.sc-search-box .icon{position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:12px;color:var(--muted);pointer-events:none}
+.sc-btn{border:1px solid var(--rule);background:var(--card);border-radius:8px;padding:5px 10px;cursor:pointer;font-size:11px;font-weight:600;color:var(--muted);transition:var(--transition);font-family:inherit;display:flex;align-items:center;gap:4px;white-space:nowrap}
+.sc-btn:hover{background:#f1f5f9;color:var(--ink);border-color:#cbd5e1}
+.sc-btn.active{background:#eef2ff;color:#4f46e5;border-color:#c7d2fe}
+.sc-layer-toggles{display:flex;gap:4px;align-items:center;background:#f1f5f9;border-radius:8px;padding:3px}
+.sc-layer-toggle{border:none;background:transparent;padding:4px 8px;border-radius:6px;cursor:pointer;font-size:10px;font-weight:600;color:var(--muted);transition:var(--transition);font-family:inherit}
+.sc-layer-toggle:hover{color:var(--ink);background:rgba(255,255,255,.5)}
+.sc-layer-toggle.active{background:var(--card);color:var(--ink);box-shadow:var(--shadow)}
+
+/* ===== Resilience Score ===== */
+.sc-resilience{display:flex;align-items:center;gap:10px;background:#f8f9fb;border-radius:10px;padding:10px 14px;margin-bottom:14px}
+.sc-resilience-gauge{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative}
+.sc-resilience-gauge svg{position:absolute;top:0;left:0;width:100%;height:100%}
+.sc-resilience-gauge .score{font-size:16px;font-weight:800;z-index:1}
+.sc-resilience-info{flex:1}
+.sc-resilience-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;margin-bottom:2px}
+.sc-resilience-title{font-size:14px;font-weight:700;margin-bottom:3px}
+.sc-resilience-desc{font-size:11px;color:var(--muted);line-height:1.4}
+.sc-resilience-bar{height:4px;border-radius:2px;background:var(--rule);margin-top:6px;overflow:hidden}
+.sc-resilience-bar-fill{height:100%;border-radius:2px;transition:width .5s ease}
+
+/* ===== ESG Risk ===== */
+.sc-esg-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f1f5f9;font-size:12px}
+.sc-esg-row:last-child{border-bottom:none}
+.sc-esg-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.sc-esg-label{flex:1;color:var(--ink)}
+.sc-esg-badge{font-size:10px;padding:2px 8px;border-radius:6px;font-weight:700}
+.sc-esg-badge.high{background:#fee2e2;color:#991b1b}
+.sc-esg-badge.medium{background:#fef3c7;color:#92400e}
+.sc-esg-badge.low{background:#dcfce7;color:#166534}
+
+/* ===== Geography ===== */
+.sc-geo-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.sc-geo-item{background:#f8f9fb;border-radius:8px;padding:8px 10px;display:flex;align-items:center;justify-content:space-between}
+.sc-geo-region{font-size:12px;font-weight:600;color:var(--ink)}
+.sc-geo-count{font-size:11px;color:var(--muted)}
+.sc-geo-bar{height:3px;border-radius:2px;background:var(--rule);margin-top:4px;overflow:hidden}
+.sc-geo-bar-fill{height:100%;border-radius:2px;transition:width .5s ease}
+
+/* ===== Peer SC Comparison ===== */
+.sc-peer-compare{margin-top:14px}
+.sc-peer-compare h3{font-size:11px;font-weight:700;color:var(--muted);margin-bottom:8px;letter-spacing:.5px;text-transform:uppercase}
+.sc-peer-sc-table{width:100%;border-collapse:collapse;font-size:11px}
+.sc-peer-sc-table th{text-align:left;padding:4px 6px;background:#f8f9fb;border-radius:5px;font-weight:600;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.3px;position:sticky;top:0}
+.sc-peer-sc-table th.num{text-align:right}
+.sc-peer-sc-table td{padding:4px 6px;border-bottom:1px solid #f1f5f9;cursor:pointer;transition:background .15s}
+.sc-peer-sc-table tr:hover td{background:#f0f7ff}
+.sc-peer-sc-table tr.current td{background:#eef2ff;font-weight:600}
+.sc-peer-sc-table td.num{text-align:right;font-variant-numeric:tabular-nums}
+.sc-peer-sc-table .resilience-dot{display:inline-block;width:20px;height:20px;line-height:20px;text-align:center;border-radius:50%;font-size:9px;font-weight:700;color:#fff}
+
+/* ===== Export Notification ===== */
+.sc-export-toast{position:fixed;top:20px;right:20px;background:var(--green);color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:600;box-shadow:var(--shadow-lg);z-index:100;opacity:0;transform:translateX(100%);transition:all .3s ease;pointer-events:none}
+.sc-export-toast.show{opacity:1;transform:translateX(0)}
+
+@media(max-width:1024px){
+  .chart-wrap.panel-open{margin-right:0}
+  .side-panel{width:100%}
+  .legend-bar{display:none}
+}
+@media(max-width:768px){
+  .header{flex-wrap:wrap;padding:8px 12px}
+  .search-box input{width:140px}
+  .search-box input:focus{width:180px}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <h1>财富世界500强 · 利润表桑基图</h1>
+    <span class="badge">营收 → 毛利 → 运营利润 → 净利</span>
+  </div>
+  <div class="header-right">
+    <div class="year-selector" id="yearSelector">
+      <button class="year-btn" data-year="2022">2022年</button>
+      <button class="year-btn" data-year="2023">2023年</button>
+      <button class="year-btn active" data-year="2024">2024年</button>
+      <button class="year-btn" data-year="2025">2025年</button>
+    </div>
+    <div class="search-box">
+      <span class="icon">🔍</span>
+      <input type="text" id="searchInput" placeholder="搜索企业（如：苹果、沃尔玛…）" autocomplete="off">
+      <div class="suggestions" id="suggestions"></div>
+    </div>
+    <span class="data-source-badge" id="dataSourceBadge" style="display:none"></span>
+    <div class="legend-bar" id="legendBar">
+      <div class="legend-item"><div class="legend-dot" style="background:#3b82f6"></div>营收</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#10b981"></div>利润</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#ef4444"></div>成本/税费</div>
+    </div>
+  </div>
+</div>
+
+<div class="main">
+  <div class="chart-wrap" id="chartWrap">
+    <div class="chart-title" id="chartTitle" style="display:none">
+      <h2 id="titleCompany"></h2>
+      <div class="subtitle" id="titleMeta"></div>
+    </div>
+    <div id="sankeyChart"></div>
+    <div class="tooltip-hint" id="hintBar">
+      <span>🔍</span> 搜索企业 · <kbd>←</kbd> <kbd>→</kbd> 切换年份 · <kbd>Esc</kbd> 关闭面板
+    </div>
+    <div class="sc-info-bar" id="scInfoBar"></div>
+    <div class="sc-toolbar" id="scToolbar">
+      <div class="sc-search-box">
+        <span class="icon">🔍</span>
+        <input type="text" id="scSearchInput" placeholder="搜索供应链节点…" autocomplete="off">
+      </div>
+      <div class="sc-layer-toggles" id="scLayerToggles">
+        <button class="sc-layer-toggle active" data-depth="0">上游</button>
+        <button class="sc-layer-toggle active" data-depth="1">企业</button>
+        <button class="sc-layer-toggle active" data-depth="2">产品/服务</button>
+        <button class="sc-layer-toggle active" data-depth="3">下游</button>
+      </div>
+      <button class="sc-btn" id="scExportImg" title="导出为图片">📷 图片</button>
+      <button class="sc-btn" id="scExportJson" title="导出为JSON">📄 JSON</button>
+    </div>
+    <div class="no-data" id="noData">
+      <div>
+        <div class="icon">📊</div>
+        <div>请在上方搜索框中输入企业名称</div>
+        <div style="font-size:12px;margin-top:4px">支持中英文搜索，如"苹果"、"沃尔玛"、"国家电网"</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="side-panel" id="sidePanel">
+    <div class="panel-header">
+      <div>
+        <h2 id="panelTitle">企业名称</h2>
+        <div class="subtitle" id="panelSubtitle"></div>
+      </div>
+      <button class="close-btn" id="closePanel">✕</button>
+    </div>
+    <div class="tab-bar">
+      <button class="tab-btn active" data-tab="overview"><span class="tab-icon">📊</span>概览</button>
+      <button class="tab-btn" data-tab="trend"><span class="tab-icon">📈</span>趋势</button>
+      <button class="tab-btn" data-tab="peers"><span class="tab-icon">🧭</span>同业</button>
+      <button class="tab-btn" data-tab="insights"><span class="tab-icon">💡</span>洞察</button>
+      <button class="tab-btn" data-tab="supplychain"><span class="tab-icon">🔗</span>供应链</button>
+    </div>
+    <div class="tab-content">
+      <!-- Tab: Overview -->
+      <div class="tab-pane active" id="tab-overview">
+        <div class="fin-grid" id="financeGrid"></div>
+        <div class="flow-table" id="flowTable" style="margin-top:14px"></div>
+        <div class="metrics" id="metricsSection" style="margin-top:14px"></div>
+      </div>
+      <!-- Tab: Trend -->
+      <div class="tab-pane" id="tab-trend">
+        <div class="trend-section">
+          <h3>营收与利润趋势（2022-2025）</h3>
+          <div id="trendChart"></div>
+        </div>
+        <div class="trend-section">
+          <h3>利润率趋势</h3>
+          <div id="marginChart"></div>
+        </div>
+        <div class="trend-metrics" id="trendMetrics"></div>
+      </div>
+      <!-- Tab: Peers -->
+      <div class="tab-pane" id="tab-peers">
+        <div class="peers">
+          <h3 id="peerTitle">同行业企业对比</h3>
+          <table class="peer-table" id="peerTable"></table>
+        </div>
+        <div class="sc-peer-compare" id="peerSCCompare"></div>
+      </div>
+      <!-- Tab: Insights -->
+      <div class="tab-pane" id="tab-insights">
+        <div class="insights" id="insightsContainer"></div>
+      </div>
+      <!-- Tab: Supply Chain -->
+      <div class="tab-pane" id="tab-supplychain">
+        <div id="supplyChainContainer"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="sc-export-toast" id="scExportToast"></div>
+
+<script>
+// ===== 供应链节点 → 500强企业 别名映射表 =====
+// 用于点击下钻时的模糊匹配：节点名称 → 对应的500强企业名
+const SC_ALIAS_MAP = {
+  // --- 半导体/电子 ---
+  '台积电': '台积公司', 'TSMC': '台积公司', '台积电/英伟达': '台积公司',
+  '三星': '三星电子', 'Samsung': '三星电子', 'Samsung Display': '三星电子',
+  'Samsung SDI': '三星电子', 'Samsung Electro-Mechanics': '三星电子',
+  'SK海力士': 'SK集团', 'SK Hynix': 'SK集团',
+  'LG': 'LG电子', 'LG新能源': 'LG化学公司',
+  'ASML': null, '高通': '高通公司', '博通': '博通公司',
+  '英特尔': '英特尔公司', '英伟达': '英伟达', '美光': '美光科技公司',
+  '联发科': '联发科半导体公司', 'AMD': '超威半导体公司',
+  '德州仪器': '德州仪器公司', '应用材料': '应用材料公司',
+  // --- 汽车及子公司 ---
+  '富士康': '鸿海精密工业股份有限公司', '鸿海': '鸿海精密工业股份有限公司',
+  'Foxconn': '鸿海精密工业股份有限公司',
+  'Daihatsu': '丰田汽车', 'Hino': '丰田汽车', 'Toyota Financial Services': '丰田汽车',
+  'MINI': '宝马集团', 'Rolls-Royce Motor Cars': '宝马集团', 'BMW Bank': '宝马集团',
+  'Mercedes-Benz AG': '梅赛德斯-奔驰集团', 'Mercedes-Benz Vans': '梅赛德斯-奔驰集团',
+  'FordPro': '福特汽车公司', 'Ford Motor Credit': '福特汽车公司',
+  'GM Financial': '通用汽车公司', 'Cruise': '通用汽车公司', 'BrightDrop': '通用汽车公司',
+  'Aramco Trading': '沙特阿美公司', 'Motiva': '沙特阿美公司',
+  'S-Oil': null, 'SATORP': null, 'Petro Rabigh': null, 'Yasref': null,
+  // --- 科技子公司/品牌 ---
+  'AWS': '亚马逊', 'Amazon Web Services': '亚马逊',
+  'Whole Foods Market': '亚马逊', 'iRobot': '亚马逊', 'Kuiper Systems': '亚马逊',
+  'Lazada': '阿里巴巴集团控股有限公司', 'AliExpress': '阿里巴巴集团控股有限公司',
+  'Instagram': 'Meta Platforms公司', 'WhatsApp': 'Meta Platforms公司',
+  'Oculus': 'Meta Platforms公司', 'Mapillary': 'Meta Platforms公司',
+  'Apple Studios': '苹果公司', 'Beats Electronics': '苹果公司',
+  'Beddit': '苹果公司', 'Braeburn Capital': '苹果公司', 'Claris': '苹果公司',
+  'Bloomberg': null, 'Refinitiv': null,
+  // --- 零售子公司 ---
+  "Sam's Club": '沃尔玛', 'Walmart International': '沃尔玛', 'Walmart Labs': '沃尔玛',
+  'Walmart+': '沃尔玛',
+  // --- 金融子公司 ---
+  'Goldman Sachs Bank USA': '高盛集团', 'Marcus': '高盛集团',
+  'Optum': '联合健康集团', 'OptumRx': '联合健康集团', 'UnitedHealthcare': '联合健康集团',
+  // --- 食品/饮料品牌 ---
+  'Nespresso': '雀巢公司', 'Nestlé Purina': '雀巢公司', 'Nestlé Waters': '雀巢公司',
+  '卡夫亨氏': '卡夫亨氏食品公司',
+  '可口可乐': '可口可乐公司', 'Coca-Cola': '可口可乐公司',
+  '百事': '百事公司', 'PepsiCo': '百事公司',
+  // --- 化工/能源 ---
+  'SABIC': '沙特基础工业公司',
+  '中国石化': '中国石油化工集团有限公司', '中石化': '中国石油化工集团有限公司',
+  '中国石油': '中国石油天然气集团有限公司', '中石油': '中国石油天然气集团有限公司',
+  '中油国际': '中国石油天然气集团有限公司', '中油工程': '中国石油天然气集团有限公司',
+  // --- 中国企业简称 ---
+  '博世': '博世集团',
+  '京东健康': '京东集团股份有限公司', '京东物流': '京东集团股份有限公司',
+  '京东数科': '京东集团股份有限公司',
+  '南瑞继保': '国家电网有限公司',
+  '华为': '华为投资控股有限公司',
+  '比亚迪': '比亚迪股份有限公司',
+  '宁德时代': '宁德时代新能源科技股份有限公司',
+  '腾讯': '腾讯控股有限公司',
+  '阿里': '阿里巴巴集团控股有限公司', '阿里巴巴': '阿里巴巴集团控股有限公司',
+  '联想': '联想集团有限公司',
+  '美团': '美团公司',
+  '百度': '百度公司',
+  '字节跳动': '字节跳动有限公司',
+  '中海油': '中国海洋石油集团有限公司',
+  '中化': '中国中化控股有限责任公司',
+  '中粮': '中粮集团有限公司',
+  '上汽': '上海汽车集团股份有限公司',
+  '一汽': '中国第一汽车集团有限公司',
+  '东风': '东风汽车集团有限公司',
+  '广汽': '广州汽车工业集团有限公司',
+  '北汽': '北京汽车集团有限公司',
+  '吉利': '浙江吉利控股集团有限公司',
+  '长城': '长城汽车股份有限公司',
+  // --- 日本企业 ---
+  '丰田纺织': '丰田汽车公司', '电装': '电装公司',
+  'JTEKT': '捷太格特公司', '普利司通': '普利司通公司',
+  // --- 其他 ---
+  'MGM Studios': '亚马逊',
+  'Toyota Financial Services': '丰田汽车公司',
+};
+
+// ===== 查找500强企业匹配 =====
+// 返回 { name: '500强企业名', confidence: 'exact'|'alias'|'fuzzy'|'parent', alias?: '原节点名' } 或 null
+function findCompanyMatch(nodeName) {
+  if (!nodeName) return null;
+  const cleanNodeName = nodeName.replace(/^⚠\s*/, '').trim();
+
+  // 0. 排除通用描述（非企业名）
+  const genericPatterns = [
+    /原材料/, /相关市场$/, /相关原材料/, /供应商$/, /制造商$/, /服务商$/,
+    /服务提供方$/, /消费[者户]$/, /客户$/, /市场$/, /设备$/, /设施$/,
+    /包装材料$/, /化工催化剂/, /乳制品/, /可可供应商/, /医疗设备公司/,
+    /医疗器械公司/, /医院.*网络/, /发电企业/, /电力设备制造商/,
+    /租赁公司$/, /电信运营商$/, /贸易/, /进口原油/, /原油进口/,
+    /加油站网络/, /门店/, /电商用户/, /消费者/, /经销商/, /参保人/,
+    /借款人/, /投资客户/, /理财/, /贷款客户/, /通信客户/, /雇主$/,
+  ];
+  for (const p of genericPatterns) {
+    if (p.test(cleanNodeName)) return null;
+  }
+  // 排除过短或纯数字
+  if (cleanNodeName.length < 2 || /^\d+$/.test(cleanNodeName)) return null;
+
+  const allCompanies = new Set();
+  for (const yearData of Object.values(INCOME_SANKEY_DATA)) {
+    for (const name of Object.keys(yearData)) {
+      allCompanies.add(name);
+    }
+  }
+
+  // 1. 精确匹配
+  if (allCompanies.has(cleanNodeName)) {
+    return { name: cleanNodeName, confidence: 'exact' };
+  }
+
+  // 2. 别名表查找
+  const aliasTarget = SC_ALIAS_MAP[cleanNodeName];
+  if (aliasTarget === null) return null; // 明确标记为"不在500强"
+  if (aliasTarget && allCompanies.has(aliasTarget)) {
+    return { name: aliasTarget, confidence: 'alias', alias: cleanNodeName };
+  }
+
+  // 2.5 括号解析+斜杠拆分：处理 "产品名(企业名)" 或 "企业A/企业B(产品)" 等组合条目
+  // 提取括号外的部分和括号内的部分，再用 / 分割，生成候选片段
+  const outerPart = cleanNodeName.replace(/[（(].*?[)）]/g, '').trim();
+  const innerParts = [];
+  const innerMatches = cleanNodeName.matchAll(/[（(]([^)）]+)[)）]/g);
+  for (const im of innerMatches) {
+    // 括号内容按 / 分割
+    im[1].split(/[/／]/).forEach(s => {
+      s = s.trim();
+      if (s && s.length >= 2) innerParts.push(s);
+    });
+  }
+  // 也对括号外部分按 / 分割
+  const outerParts = outerPart.split(/[/／]/).map(s => s.trim()).filter(s => s && s.length >= 2);
+  // 合并所有候选片段：括号外部分 + 括号内部分
+  const candidateFragments = [...outerParts, ...innerParts];
+
+  // 对每个候选片段尝试 精确匹配 → 别名表 → 模糊匹配
+  if (candidateFragments.length > 1 || (candidateFragments.length === 1 && candidateFragments[0] !== cleanNodeName)) {
+    for (const frag of candidateFragments) {
+      // 跳过通用描述片段
+      let isGeneric = false;
+      for (const p of genericPatterns) {
+        if (p.test(frag)) { isGeneric = true; break; }
+      }
+      if (isGeneric) continue;
+
+      // 精确匹配
+      if (allCompanies.has(frag)) {
+        return { name: frag, confidence: 'fuzzy', alias: cleanNodeName };
+      }
+      // 别名表
+      const fragAlias = SC_ALIAS_MAP[frag];
+      if (fragAlias === null) continue;
+      if (fragAlias && allCompanies.has(fragAlias)) {
+        return { name: fragAlias, confidence: 'alias', alias: cleanNodeName };
+      }
+      // 模糊匹配：片段 ⊂ 企业名
+      for (const companyName of allCompanies) {
+        if (companyName.includes(frag) || frag.includes(companyName)) {
+          const score = Math.min(frag.length, companyName.length) /
+                        Math.max(frag.length, companyName.length);
+          if (score >= 0.5) {
+            return { name: companyName, confidence: 'fuzzy', alias: cleanNodeName };
+          }
+        }
+      }
+    }
+  }
+
+  // 3. 模糊匹配：节点名是500强企业名的子串或反之
+  let bestFuzzy = null;
+  let bestScore = 0;
+  for (const companyName of allCompanies) {
+    // 3a. 包含匹配：节点名 ⊂ 企业名 或 企业名 ⊂ 节点名
+    if (companyName.includes(cleanNodeName) || cleanNodeName.includes(companyName)) {
+      const score = Math.min(cleanNodeName.length, companyName.length) /
+                    Math.max(cleanNodeName.length, companyName.length);
+      if (score > bestScore && score >= 0.5) {
+        bestScore = score;
+        bestFuzzy = { name: companyName, confidence: 'fuzzy', alias: cleanNodeName };
+      }
+    }
+    // 3b. 关键词匹配：提取节点名中的核心词（≥2字），检查是否匹配企业名
+    if (cleanNodeName.length >= 3) {
+      const coreWord = cleanNodeName.replace(/[公司集团股份有限控股有限责任]/g, '').trim();
+      if (coreWord.length >= 2 && companyName.includes(coreWord)) {
+        const score = coreWord.length / Math.max(cleanNodeName.length, companyName.length) * 0.8;
+        if (score > bestScore && score >= 0.3) {
+          bestScore = score;
+          bestFuzzy = { name: companyName, confidence: 'fuzzy', alias: cleanNodeName };
+        }
+      }
+    }
+  }
+  if (bestFuzzy) return bestFuzzy;
+
+  // 4. 英文品牌名匹配：检查节点名是否为某500强企业的英文品牌
+  const enNameLower = cleanNodeName.toLowerCase();
+  for (const companyName of allCompanies) {
+    const yearData = INCOME_SANKEY_DATA[currentYear] || Object.values(INCOME_SANKEY_DATA)[0];
+    const d = yearData?.[companyName]?.details;
+    if (d && d.en_name) {
+      const enLower = d.en_name.toLowerCase();
+      if (enLower.includes(enNameLower) || enNameLower.includes(enLower)) {
+        const score = Math.min(enNameLower.length, enLower.length) /
+                      Math.max(enNameLower.length, enLower.length);
+        if (score >= 0.5) {
+          return { name: companyName, confidence: 'fuzzy', alias: cleanNodeName };
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+// ===== 节点名称中英文映射 =====
+const NODE_CN = {
+  'Revenue': '营业收入', 'Gross Profit': '毛利润', 'Cost of Revenue': '营业成本',
+  'Operating Profit': '运营利润', 'R&D': '研发费用', 'SG&A': '销售管理费用',
+  'Net Profit': '净利润', 'Tax': '所得税',
+};
+const YEARS = ['2022','2023','2024','2025'];
+
+let currentYear = '2024';
+let currentCompany = null;
+let currentTab = 'overview';
+let mainChart = null;
+let trendChart = null;
+let marginChart = null;
+// Supply chain chart state
+let scChartData = null;        // { nodes, links, nodeMeta, sc, stats, resilience }
+let scCollapsedLayers = new Set(); // collapsed layer depths
+let scSearchTerm = '';         // current search term for SC highlighting
+
+window.addEventListener('DOMContentLoaded', () => {
+  mainChart = echarts.init(document.getElementById('sankeyChart'));
+  trendChart = echarts.init(document.getElementById('trendChart'));
+  marginChart = echarts.init(document.getElementById('marginChart'));
+  bindEvents();
+  window.addEventListener('resize', () => {
+    mainChart && mainChart.resize();
+    trendChart && trendChart.resize();
+    marginChart && marginChart.resize();
+  });
+
+  // 默认加载苹果公司
+  setTimeout(() => {
+    const input = document.getElementById('searchInput');
+    input.value = '苹果';
+    input.dispatchEvent(new Event('input'));
+    setTimeout(() => {
+      const first = document.querySelector('.suggestion-item');
+      if (first && first.dataset.name) {
+        input.value = first.dataset.name;
+        document.getElementById('suggestions').classList.remove('show');
+        renderChart(first.dataset.name);
+      }
+    }, 200);
+  }, 300);
+});
+
+function bindEvents() {
+  // 年份选择
+  document.getElementById('yearSelector').addEventListener('click', (e) => {
+    const btn = e.target.closest('.year-btn');
+    if (!btn) return;
+    currentYear = btn.dataset.year;
+    document.querySelectorAll('.year-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    if (currentCompany) renderChart(currentCompany);
+  });
+
+  document.getElementById('closePanel').addEventListener('click', closePanel);
+
+  // Tab 切换
+  document.querySelector('.tab-bar').addEventListener('click', (e) => {
+    const btn = e.target.closest('.tab-btn');
+    if (!btn) return;
+    const tab = btn.dataset.tab;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + tab).classList.add('active');
+    // 切换到趋势tab时渲染图表
+    if (tab === 'trend') setTimeout(() => { trendChart && trendChart.resize(); marginChart && marginChart.resize(); renderTrendCharts(); }, 50);
+    if (tab === 'peers') { renderPeerTable(); renderPeerSupplyChain(); }
+    // 切换到供应链tab时渲染供应链桑基图
+    if (tab === 'supplychain') { renderSupplyChainChart(); }
+    // 切换离开供应链tab时恢复利润表桑基图并隐藏信息栏
+    if (currentTab === 'supplychain' && tab !== 'supplychain') {
+      updateLegendForTab(tab);
+      updateSCInfoBar(null);
+      if (currentCompany) renderIncomeSankey();
+    }
+    currentTab = tab;
+  });
+
+  // 搜索建议
+  const input = document.getElementById('searchInput');
+  const sugBox = document.getElementById('suggestions');
+
+  input.addEventListener('input', (e) => {
+    const term = e.target.value.trim().toLowerCase();
+    if (!term) { sugBox.classList.remove('show'); return; }
+    const yearData = INCOME_SANKEY_DATA[currentYear] || {};
+    const matches = [];
+    for (const [name, data] of Object.entries(yearData)) {
+      const d = data.details;
+      const enName = (d.en_name || '').toLowerCase();
+      const cnName = name.toLowerCase();
+      if (cnName.includes(term) || enName.includes(term)) {
+        matches.push({ name, rank: d.rank, country: d.country, industry: d.sub_industry, revenue: d.revenue });
+      }
+    }
+    matches.sort((a, b) => a.rank - b.rank);
+    if (matches.length > 0) {
+      sugBox.innerHTML = matches.slice(0, 15).map(m =>
+        `<div class="suggestion-item" data-name="${m.name}">
+          <div class="sug-name">第${m.rank}名 ${m.name}</div>
+          <div class="sug-meta">${m.country} · ${m.industry} · 营收 ${(m.revenue * 10).toFixed(0)}亿美元</div>
+        </div>`
+      ).join('');
+      sugBox.classList.add('show');
+      sugBox.querySelectorAll('.suggestion-item').forEach(item => {
+        item.addEventListener('click', () => {
+          input.value = item.dataset.name;
+          sugBox.classList.remove('show');
+          renderChart(item.dataset.name);
+        });
+      });
+    } else {
+      sugBox.innerHTML = '<div class="suggestion-item" style="color:var(--muted)">未找到匹配企业</div>';
+      sugBox.classList.add('show');
+    }
+  });
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      const firstItem = sugBox.querySelector('.suggestion-item');
+      if (firstItem && firstItem.dataset.name) {
+        input.value = firstItem.dataset.name;
+        sugBox.classList.remove('show');
+        renderChart(firstItem.dataset.name);
+      }
+    }
+    if (e.key === 'Escape') sugBox.classList.remove('show');
+  });
+
+  // 键盘导航
+  document.addEventListener('keydown', (e) => {
+    if (e.target.closest('input')) return;
+    if (e.key === 'Escape') closePanel();
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      const idx = YEARS.indexOf(currentYear);
+      const newIdx = e.key === 'ArrowLeft' ? Math.max(0, idx-1) : Math.min(YEARS.length-1, idx+1);
+      if (newIdx !== idx) {
+        currentYear = YEARS[newIdx];
+        document.querySelectorAll('.year-btn').forEach(b => b.classList.remove('active'));
+        document.querySelector(`[data-year="${currentYear}"]`).classList.add('active');
+        if (currentCompany) renderChart(currentCompany);
+      }
+    }
+  });
+
+  // ===== SC Toolbar events =====
+  // SC search
+  document.getElementById('scSearchInput').addEventListener('input', (e) => {
+    scSearchTerm = e.target.value.trim().toLowerCase();
+    if (scChartData) applySCFiltering();
+  });
+
+  // Layer toggles
+  document.getElementById('scLayerToggles').addEventListener('click', (e) => {
+    const btn = e.target.closest('.sc-layer-toggle');
+    if (!btn) return;
+    const depth = parseInt(btn.dataset.depth);
+    if (scCollapsedLayers.has(depth)) {
+      scCollapsedLayers.delete(depth);
+      btn.classList.add('active');
+    } else {
+      scCollapsedLayers.add(depth);
+      btn.classList.remove('active');
+    }
+    if (scChartData) applySCFiltering();
+  });
+
+  // Export
+  document.getElementById('scExportImg').addEventListener('click', exportSCImage);
+  document.getElementById('scExportJson').addEventListener('click', exportSCJSON);
+
+  // Chart node click for drill-down
+  mainChart.on('click', onSCNodeClick);
+}
+
+// ===== 工具函数 =====
+function fmtMoney(v) {
+  const yi = v * 10;
+  return v >= 0 ? `${yi.toFixed(1)}亿美元` : `-${Math.abs(yi).toFixed(1)}亿美元`;
+}
+function fmtNum(v) { return v >= 0 ? `${(v * 10).toFixed(1)}` : `-${Math.abs(v * 10).toFixed(1)}`; }
+
+// 计算同比增速
+function calcYoY(companyName, field, year) {
+  const idx = YEARS.indexOf(year);
+  if (idx <= 0) return null;
+  const prevYear = YEARS[idx - 1];
+  const cur = INCOME_SANKEY_DATA[year]?.[companyName]?.details[field];
+  const prev = INCOME_SANKEY_DATA[prevYear]?.[companyName]?.details[field];
+  if (cur == null || prev == null || prev === 0) return null;
+  return ((cur - prev) / Math.abs(prev) * 100);
+}
+
+// 获取多年数据序列
+function getMultiYearData(companyName, field) {
+  return YEARS.map(y => {
+    const d = INCOME_SANKEY_DATA[y]?.[companyName]?.details;
+    return d ? d[field] : null;
+  });
+}
+
+// 格式化同比标签
+function yoyTag(val) {
+  if (val == null) return '';
+  const abs = Math.abs(val);
+  const sign = val >= 0 ? '+' : '';
+  const cls = abs < 0.5 ? 'flat' : (val >= 0 ? 'up' : 'down');
+  return `<span class="yoy ${cls}">${sign}${val.toFixed(1)}%</span>`;
+}
+
+// ===== 获取节点值 =====
+function getNodeValue(enName, data) {
+  const d = data.details;
+  const map = {
+    'Revenue': d.revenue, 'Gross Profit': d.gross_profit, 'Cost of Revenue': d.cost_of_revenue,
+    'Operating Profit': d.operating_profit, 'R&D': d.rd_expense, 'SG&A': d.sga_expense,
+    'Net Profit': d.net_profit, 'Tax': d.tax,
+  };
+  return map[enName] || 0;
+}
+
+// ===== 渲染利润表桑基图 =====
+function renderIncomeSankey() {
+  if (!currentCompany) return;
+  const yearData = INCOME_SANKEY_DATA[currentYear];
+  if (!yearData || !yearData[currentCompany]) return;
+  const data = yearData[currentCompany];
+  const d = data.details;
+
+  // 桑基图节点
+  const nodes = data.nodes.map(n => ({
+    name: n.name, depth: n.depth, itemStyle: n.itemStyle,
+    label: {
+      show: true,
+      position: n.depth === 0 ? 'left' : 'right',
+      fontSize: n.depth === 0 ? 13 : 12,
+      fontWeight: 'bold', color: '#1e293b',
+      formatter: (p) => {
+        const val = getNodeValue(p.name, data);
+        const cnName = NODE_CN[p.name] || p.name;
+        if (n.depth === 0) {
+          const yoy = calcYoY(currentCompany, 'revenue', currentYear);
+          const yoyStr = yoy != null ? `  ${yoy >= 0 ? '↑' : '↓'}${Math.abs(yoy).toFixed(1)}%` : '';
+          return `${cnName}\n${fmtMoney(val)}${yoyStr}`;
+        }
+        return `${cnName}\n${fmtMoney(val)}`;
+      }
+    }
+  }));
+
+  const option = {
+    tooltip: {
+      trigger: 'item', triggerOn: 'mousemove',
+      backgroundColor: '#fff', borderColor: '#e2e8f0', borderWidth: 1,
+      padding: [10, 14], textStyle: {color: '#1e293b', fontSize: 13},
+      formatter: (params) => {
+        if (params.dataType === 'edge') {
+          const pct = (params.data.value / d.revenue * 100).toFixed(1);
+          const srcCN = NODE_CN[params.data.source] || params.data.source;
+          const tgtCN = NODE_CN[params.data.target] || params.data.target;
+          return `<b>${srcCN}</b> → <b>${tgtCN}</b><br/>金额：<b>${fmtMoney(params.data.value)}</b><br/>占营收：<b>${pct}%</b>`;
+        }
+        if (params.dataType === 'node') {
+          const val = getNodeValue(params.name, data);
+          const pct = (val / d.revenue * 100).toFixed(1);
+          const cnName = NODE_CN[params.name] || params.name;
+          return `<b>${cnName}</b><br/>金额：<b>${fmtMoney(val)}</b><br/>占营收：<b>${pct}%</b>`;
+        }
+      }
+    },
+    series: [{
+      type: 'sankey', layout: 'none',
+      emphasis: {focus: 'adjacency'},
+      nodeAlign: 'left', layoutIterations: 32, orient: 'horizontal',
+      data: nodes, links: data.links,
+      lineStyle: {color: 'gradient', curveness: 0.5, opacity: 0.35},
+      itemStyle: {borderWidth: 0},
+      nodeWidth: 22, nodeGap: 14,
+      top: 60, bottom: 40, left: 150, right: 170,
+    }]
+  };
+  mainChart.setOption(option, true);
+  // 恢复利润表图例并隐藏供应链信息栏
+  updateLegendForTab('overview');
+  updateSCInfoBar(null);
+}
+
+// ===== 渲染供应链桑基图（综合版） =====
+function renderSupplyChainChart() {
+  if (!currentCompany) return;
+  const sc = (typeof SUPPLY_CHAIN_DATA !== 'undefined') ? SUPPLY_CHAIN_DATA[currentCompany] : null;
+  if (!sc) {
+    mainChart.setOption({
+      title: { text: '暂无供应链数据', left: 'center', top: 'center', textStyle: { color: '#94a3b8', fontSize: 16 } }
+    }, true);
+    updateSCInfoBar(null);
+    return;
+  }
+
+  const yearData = INCOME_SANKEY_DATA[currentYear];
+  const d = yearData?.[currentCompany]?.details;
+  const revenue = d ? d.revenue * 10 : 100; // 亿美元
+  const industry = d ? d.sub_industry : (sc.industry || '');
+  const country = d ? d.country : '';
+  const fmtYi = (v) => v >= 0 ? `${v.toFixed(1)}亿美元` : `-${Math.abs(v).toFixed(1)}亿美元`;
+
+  // ===== 解析供应链各层数据 =====
+  function parseList(str, delimiter) {
+    if (!str) return [];
+    return str.split(delimiter).map(s => s.trim()).filter(s => s && s.length > 1);
+  }
+  function parseSuppliers(str) {
+    if (!str) return [];
+    return str.split(/[、,，]/).map(s => {
+      s = s.trim();
+      if (!s || s.length < 2) return null;
+      const m = s.match(/^(.+?)[（(](.+?)[)）]$/);
+      return m ? { name: m[1].trim(), role: m[2].trim(), full: s } : { name: s, role: '', full: s };
+    }).filter(Boolean);
+  }
+  function cleanName(s) { return s.replace(/[（(].*?[)）]/g, '').trim() || s; }
+
+  const upstreamItems = parseList(sc.upstream, /[、；;]/);
+  const supplierItems = parseSuppliers(sc.key_suppliers);
+  const productItems = parseList(sc.products, /[、,，]/);
+  const serviceItems = parseList(sc.services, /[、,，]/);
+  const brandItems = parseList(sc.brands, /[、,，]/);
+  const subsidiaryItems = parseList(sc.subsidiaries, /[、,，]/);
+  const downstreamItems = parseList(sc.downstream, /[、；;]/);
+  const areaItems = parseList(sc.area_served, /[、,，]/);
+  const bottlenecks = sc.bottlenecks || [];
+  const downstreamUnique = [...new Set([...downstreamItems, ...areaItems])];
+
+  // ===== 构建桑基图 =====
+  const nodes = [];
+  const links = [];
+  const nodeSet = new Set();
+  const nodeMeta = {};
+
+  function addNode(name, depth, color, meta) {
+    meta = meta || {};
+    if (!nodeSet.has(name)) {
+      nodes.push({
+        name, depth,
+        itemStyle: { color, borderWidth: 0 },
+        label: {
+          show: true,
+          position: depth === 0 ? 'left' : 'right',
+          fontSize: depth === 1 ? 13 : 11,
+          color: '#1e293b',
+          fontWeight: depth === 1 ? 700 : 500,
+          formatter: (p) => {
+            const nm = nodeMeta[p.name];
+            if (!nm) return p.name;
+            if (nm.type === '核心企业') return p.name + '\n（核心企业）';
+            if (p.name.startsWith('⚠ ')) return p.name;
+            return p.name.length > 12 ? p.name.slice(0, 12) + '…' : p.name;
+          }
+        }
+      });
+      nodeSet.add(name);
+      nodeMeta[name] = Object.assign({ depth, color }, meta);
+    }
+  }
+
+  // 颜色方案
+  const C = {
+    upstream: '#3b82f6', supplier: '#6366f1', company: '#1e293b',
+    product: '#10b981', service: '#14b8a6', brand: '#a855f7',
+    subsidiary: '#64748b', downstream: '#f59e0b',
+    bn_high: '#ef4444', bn_medium: '#fbbf24', parent: '#8b5cf6',
+  };
+
+  // ===== Layer 0: 上游原材料 + 关键供应商 + 母公司 =====
+  const upstreamTotal = revenue * 0.35;
+  const upstreamCount = Math.max(upstreamItems.length, 1);
+  upstreamItems.forEach(item => {
+    const val = upstreamTotal / upstreamCount;
+    addNode(item, 0, C.upstream, { type: '上游原材料/投入', value: val, desc: '上游原材料或投入要素' });
+  });
+
+  const supplierTotal = revenue * 0.30;
+  const supplierCount = Math.max(supplierItems.length, 1);
+  supplierItems.forEach(item => {
+    const val = supplierTotal / supplierCount;
+    addNode(item.name, 0, C.supplier, {
+      type: '关键供应商', value: val, role: item.role,
+      desc: item.role ? `关键供应商：${item.name}（${item.role}）` : `关键供应商：${item.name}`
+    });
+  });
+
+  if (sc.parent_company) {
+    addNode(sc.parent_company, 0, C.parent, {
+      type: '母公司', value: revenue * 0.05, desc: `母公司：${sc.parent_company}`
+    });
+  }
+
+  // ===== Layer 1: 核心企业 =====
+  addNode(currentCompany, 1, C.company, {
+    type: '核心企业', value: revenue,
+    desc: sc.description || '', industry: industry, country: country, revenue: revenue
+  });
+
+  // 链接：上游/供应商/母公司 → 企业
+  upstreamItems.forEach(item => {
+    links.push({ source: item, target: currentCompany, value: upstreamTotal / upstreamCount });
+  });
+  supplierItems.forEach(item => {
+    links.push({ source: item.name, target: currentCompany, value: supplierTotal / supplierCount });
+  });
+  if (sc.parent_company) {
+    links.push({ source: sc.parent_company, target: currentCompany, value: revenue * 0.05 });
+  }
+
+  // 无上游数据时创建占位节点
+  if (upstreamItems.length === 0 && supplierItems.length === 0 && !sc.parent_company) {
+    addNode('综合上游投入', 0, C.upstream, { type: '上游投入', value: revenue * 0.65, desc: '综合上游投入要素' });
+    links.push({ source: '综合上游投入', target: currentCompany, value: revenue * 0.65 });
+  }
+
+  // ===== Layer 2: 产品 + 服务 + 品牌 + 子公司 + 卡脖子 =====
+  const allProdServ = [];
+
+  // 产品
+  const productTotal = revenue * 0.38;
+  productItems.forEach(item => {
+    const cn = cleanName(item);
+    const val = productTotal / Math.max(productItems.length, 1);
+    addNode(cn, 2, C.product, { type: '核心产品', value: val, desc: `核心产品：${item}` });
+    allProdServ.push(cn);
+    links.push({ source: currentCompany, target: cn, value: val });
+  });
+
+  // 服务
+  const serviceTotal = revenue * 0.12;
+  serviceItems.forEach(item => {
+    const cn = cleanName(item);
+    const val = serviceTotal / Math.max(serviceItems.length, 1);
+    addNode(cn, 2, C.service, { type: '核心服务', value: val, desc: `核心服务：${item}` });
+    allProdServ.push(cn);
+    links.push({ source: currentCompany, target: cn, value: val });
+  });
+
+  // 子公司
+  const subTotal = revenue * 0.03;
+  subsidiaryItems.forEach(item => {
+    const cn = cleanName(item);
+    const val = subTotal / Math.max(subsidiaryItems.length, 1);
+    addNode(cn, 2, C.subsidiary, { type: '子公司/关联实体', value: val, desc: `子公司：${item}` });
+    links.push({ source: currentCompany, target: cn, value: val });
+  });
+
+  // 品牌
+  const brandTotal = revenue * 0.02;
+  brandItems.forEach(item => {
+    const cn = cleanName(item);
+    const val = brandTotal / Math.max(brandItems.length, 1);
+    addNode(cn, 2, C.brand, { type: '品牌', value: val, desc: `品牌：${item}` });
+    links.push({ source: currentCompany, target: cn, value: val });
+  });
+
+  // 卡脖子要素
+  bottlenecks.forEach(bn => {
+    const bnName = '⚠ ' + bn.element;
+    const color = bn.severity === 'high' ? C.bn_high : C.bn_medium;
+    const val = bn.severity === 'high' ? revenue * 0.05 : revenue * 0.025;
+    addNode(bnName, 2, color, {
+      type: '卡脖子要素', value: val, severity: bn.severity,
+      desc: bn.description, element: bn.element
+    });
+    links.push({ source: currentCompany, target: bnName, value: val });
+  });
+
+  // ===== Layer 3: 下游市场/客户 =====
+  if (downstreamUnique.length > 0 && allProdServ.length > 0) {
+    const dsTotal = productTotal + serviceTotal;
+    const dsCount = Math.max(downstreamUnique.length, 1);
+    downstreamUnique.forEach(item => {
+      const cn = cleanName(item);
+      const val = dsTotal / dsCount;
+      addNode(cn, 3, C.downstream, { type: '下游市场/客户', value: val, desc: `下游市场：${item}` });
+      // 每个产品/服务连接到每个下游（均分权重）
+      allProdServ.forEach(prod => {
+        links.push({ source: prod, target: cn, value: val / allProdServ.length });
+      });
+    });
+  }
+
+  // 数据不足检查
+  if (nodes.length < 3) {
+    mainChart.setOption({
+      title: { text: '供应链数据不足', left: 'center', top: 'center', textStyle: { color: '#94a3b8', fontSize: 16 } }
+    }, true);
+    updateSCInfoBar(null);
+    return;
+  }
+
+  // ===== 统计信息 =====
+  const stats = {
+    upstream: upstreamItems.length, suppliers: supplierItems.length,
+    products: productItems.length, services: serviceItems.length,
+    brands: brandItems.length, subsidiaries: subsidiaryItems.length,
+    downstream: downstreamUnique.length,
+    bn_high: bottlenecks.filter(b => b.severity === 'high').length,
+    bn_medium: bottlenecks.filter(b => b.severity === 'medium').length,
+  };
+
+  // ===== 韧性评分 =====
+  const resilience = calcResilienceScore(sc, stats);
+
+  // ===== 存储全局数据 =====
+  scChartData = { nodes, links, nodeMeta, sc, stats, resilience, revenue, fmtYi, allProdServ };
+  scCollapsedLayers.clear();
+  scSearchTerm = '';
+  // 重置工具栏状态
+  document.querySelectorAll('.sc-layer-toggle').forEach(b => b.classList.add('active'));
+  const scSearchEl = document.getElementById('scSearchInput');
+  if (scSearchEl) scSearchEl.value = '';
+
+  // ===== 渲染 =====
+  renderSCChart();
+
+  // 更新标题
+  document.getElementById('titleCompany').textContent = currentCompany + ' · 供应链结构';
+  document.getElementById('titleMeta').textContent =
+    `${country ? country + ' · ' : ''}${industry} · 营收 ${fmtYi(revenue)} · 上游 → 企业 → 产品 → 下游`;
+
+  // 更新图例、信息栏、工具栏
+  updateLegendForTab('supplychain');
+  updateSCInfoBar(stats, sc, resilience);
+  document.getElementById('scToolbar').classList.add('show');
+}
+
+// ===== 供应链韧性评分计算 =====
+function calcResilienceScore(sc, stats) {
+  let score = 80; // 基础分
+  // 卡脖子要素扣分
+  score -= stats.bn_high * 12;
+  score -= stats.bn_medium * 5;
+  // 供应商集中度：供应商越少越脆弱
+  const totalUpstream = stats.upstream + stats.suppliers;
+  if (totalUpstream > 0 && totalUpstream < 3) score -= 15;
+  else if (totalUpstream < 5) score -= 8;
+  else if (totalUpstream >= 8) score += 5;
+  // 产品多元化加分
+  const totalProducts = stats.products + stats.services;
+  if (totalProducts >= 5) score += 8;
+  else if (totalProducts >= 3) score += 4;
+  else if (totalProducts <= 1) score -= 6;
+  // 下游市场多元化
+  if (stats.downstream >= 4) score += 6;
+  else if (stats.downstream <= 1) score -= 8;
+  // 品牌多元化
+  if (stats.brands >= 3) score += 4;
+  // 子公司分布
+  if (stats.subsidiaries >= 3) score += 3;
+  // 限制范围
+  score = Math.max(0, Math.min(100, Math.round(score)));
+  // 评级
+  let grade, color, desc;
+  if (score >= 80) { grade = 'A'; color = '#10b981'; desc = '供应链韧性优秀，多元化程度高，风险分散能力强'; }
+  else if (score >= 65) { grade = 'B'; color = '#3b82f6'; desc = '供应链韧性良好，存在一定集中度风险但整体可控'; }
+  else if (score >= 50) { grade = 'C'; color = '#f59e0b'; desc = '供应链韧性一般，部分环节依赖度高，需关注关键风险'; }
+  else if (score >= 35) { grade = 'D'; color = '#f97316'; desc = '供应链韧性较弱，存在显著单点依赖和卡脖子风险'; }
+  else { grade = 'F'; color = '#ef4444'; desc = '供应链韧性脆弱，高度依赖少数供应商或面临严重卡脖子'; }
+  return { score, grade, color, desc };
+}
+
+// ===== 渲染供应链桑基图（带过滤和高亮） =====
+function renderSCChart() {
+  if (!scChartData) return;
+  const { nodes: allNodes, links: allLinks, nodeMeta, resilience, fmtYi } = scChartData;
+
+  // 过滤折叠的层级
+  const visibleNodes = allNodes.filter(n => !scCollapsedLayers.has(n.depth));
+  const visibleNames = new Set(visibleNodes.map(n => n.name));
+  const visibleLinks = allLinks.filter(l => visibleNames.has(l.source) && visibleNames.has(l.target));
+
+  // 搜索高亮
+  let processedNodes = visibleNodes;
+  let processedLinks = visibleLinks;
+  if (scSearchTerm) {
+    const matchedNames = new Set();
+    visibleNodes.forEach(n => {
+      if (n.name.toLowerCase().includes(scSearchTerm)) {
+        matchedNames.add(n.name);
+        // 加入相邻节点
+        visibleLinks.forEach(l => {
+          if (l.source === n.name) matchedNames.add(l.target);
+          if (l.target === n.name) matchedNames.add(l.source);
+        });
+      }
+    });
+    processedNodes = visibleNodes.map(n => {
+      const isMatch = matchedNames.has(n.name);
+      const isDirect = n.name.toLowerCase().includes(scSearchTerm);
+      return {
+        ...n,
+        itemStyle: {
+          ...n.itemStyle,
+          opacity: isMatch ? 1 : 0.15,
+          borderColor: isDirect ? '#fbbf24' : 'transparent',
+          borderWidth: isDirect ? 3 : 0,
+        },
+        label: { ...n.label, opacity: isMatch ? 1 : 0.2 }
+      };
+    });
+    processedLinks = visibleLinks.map(l => {
+      const isMatch = matchedNames.has(l.source) && matchedNames.has(l.target);
+      return { ...l, lineStyle: { color: 'gradient', curveness: 0.5, opacity: isMatch ? 0.5 : 0.05 } };
+    });
+  }
+
+  const option = {
+    tooltip: {
+      trigger: 'item', triggerOn: 'mousemove',
+      backgroundColor: '#fff', borderColor: '#e2e8f0', borderWidth: 1,
+      padding: [12, 16], textStyle: { color: '#1e293b', fontSize: 13 },
+      extraCssText: 'max-width:420px;white-space:normal;',
+      formatter: (params) => {
+        if (params.dataType === 'edge') {
+          const sm = nodeMeta[params.data.source] || {};
+          const tm = nodeMeta[params.data.target] || {};
+          return `<b>${params.data.source}</b> → <b>${params.data.target}</b>` +
+                 `<br/><span style="color:#94a3b8;font-size:11px">${sm.type||''} → ${tm.type||''}</span>` +
+                 `<br/><span style="color:#94a3b8;font-size:11px">估算金额：${fmtYi(params.data.value)}</span>`;
+        }
+        if (params.dataType === 'node') {
+          const m = nodeMeta[params.name] || {};
+          let html = `<div style="font-size:14px;font-weight:700;margin-bottom:6px">${params.name}</div>`;
+          html += `<div style="font-size:11px;color:#94a3b8;margin-bottom:4px">类型：${m.type||''}</div>`;
+          if (m.value) html += `<div style="font-size:11px;color:#94a3b8">估算金额：<b style="color:#1e293b">${fmtYi(m.value)}</b></div>`;
+          if (m.role) html += `<div style="font-size:11px;color:#94a3b8">角色：${m.role}</div>`;
+          if (m.severity) {
+            const sc2 = m.severity === 'high' ? '#ef4444' : '#f59e0b';
+            html += `<div style="font-size:11px;color:#94a3b8">风险等级：<b style="color:${sc2}">${m.severity==='high'?'高危':'中等'}</b></div>`;
+          }
+          // ESG风险标注
+          const esg = getESGRiskForNode(m);
+          if (esg) html += `<div style="font-size:11px;color:#94a3b8">ESG风险：<b style="color:${esg.color}">${esg.label}</b></div>`;
+          if (m.type === '核心企业') {
+            if (m.industry) html += `<div style="font-size:11px;color:#94a3b8">行业：${m.industry}</div>`;
+            if (m.country) html += `<div style="font-size:11px;color:#94a3b8">总部：${m.country}</div>`;
+            html += `<div style="font-size:11px;color:#94a3b8">年营收：<b>${fmtYi(m.revenue)}</b></div>`;
+            if (m.desc) {
+              const sd = m.desc.length > 200 ? m.desc.slice(0, 200) + '…' : m.desc;
+              html += `<div style="font-size:12px;color:#475569;margin-top:6px;line-height:1.5;max-width:360px">${sd}</div>`;
+            }
+          } else if (m.desc) {
+            html += `<div style="font-size:12px;color:#475569;margin-top:6px;line-height:1.5;max-width:360px">${m.desc}</div>`;
+          }
+          // 下钻提示
+          if (m.type !== '核心企业' && m.type !== '上游原材料/投入' && m.type !== '上游投入' && m.type !== '下游市场/客户') {
+            html += `<div style="font-size:10px;color:#3b82f6;margin-top:6px;padding-top:4px;border-top:1px solid #f1f5f9">💡 点击查看该实体是否为500强企业</div>`;
+          } else if (m.type !== '核心企业') {
+            html += `<div style="font-size:10px;color:#3b82f6;margin-top:6px;padding-top:4px;border-top:1px solid #f1f5f9">💡 点击可尝试匹配500强企业</div>`;
+          }
+          return html;
+        }
+      }
+    },
+    series: [{
+      type: 'sankey', layout: 'none',
+      emphasis: { focus: 'adjacency' },
+      nodeAlign: 'justify', layoutIterations: 64, orient: 'horizontal',
+      data: processedNodes, links: processedLinks,
+      lineStyle: { color: 'gradient', curveness: 0.5, opacity: 0.22 },
+      itemStyle: { borderWidth: 0 },
+      nodeWidth: 20, nodeGap: 6,
+      top: 60, bottom: 60, left: 180, right: 200,
+    }]
+  };
+
+  mainChart.setOption(option, true);
+}
+
+// ===== 应用搜索过滤和层级折叠 =====
+function applySCFiltering() {
+  renderSCChart();
+}
+
+// ===== ESG风险标注 =====
+function getESGRiskForNode(nodeMeta) {
+  if (!nodeMeta) return null;
+  // 卡脖子高危节点
+  if (nodeMeta.type === '卡脖子要素') {
+    return nodeMeta.severity === 'high'
+      ? { level: 'high', label: '高风险', color: '#ef4444' }
+      : { level: 'medium', label: '中等风险', color: '#f59e0b' };
+  }
+  // 上游原材料 - 基于关键词判断
+  if (nodeMeta.type === '上游原材料/投入' || nodeMeta.type === '上游投入') {
+    const name = (nodeMeta.desc || '').toLowerCase();
+    if (name.includes('稀土') || name.includes('锂') || name.includes('钴') || name.includes('镍')) {
+      return { level: 'high', label: '高环境风险', color: '#ef4444' };
+    }
+    if (name.includes('半导体') || name.includes('芯片') || name.includes('原油') || name.includes('矿产')) {
+      return { level: 'medium', label: '中等环境风险', color: '#f59e0b' };
+    }
+    return { level: 'low', label: '低风险', color: '#10b981' };
+  }
+  // 关键供应商
+  if (nodeMeta.type === '关键供应商') {
+    return { level: 'medium', label: '供应商依赖风险', color: '#f59e0b' };
+  }
+  // 下游市场
+  if (nodeMeta.type === '下游市场/客户') {
+    return { level: 'low', label: '市场风险', color: '#10b981' };
+  }
+  return null;
+}
+
+// ===== 节点点击下钻 =====
+function onSCNodeClick(params) {
+  if (currentTab !== 'supplychain') return;
+  if (params.dataType !== 'node') return;
+  if (!scChartData) return;
+  const m = scChartData.nodeMeta[params.name];
+  if (!m) return;
+
+  // 核心企业节点不触发下钻
+  if (m.type === '核心企业') return;
+
+  // 排除纯描述性节点（上游原材料/下游市场等非实体名称）
+  const nodeType = m.type || '';
+  if (nodeType === '上游原材料/投入' || nodeType === '上游投入' || nodeType === '下游市场/客户') {
+    // 这些类型中可能有企业名，但也可能是通用描述，交给 findCompanyMatch 判断
+  }
+
+  // 使用模糊匹配查找500强企业
+  const match = findCompanyMatch(params.name);
+  if (match) {
+    const input = document.getElementById('searchInput');
+    input.value = match.name;
+    document.getElementById('suggestions').classList.remove('show');
+    renderChart(match.name);
+
+    // 根据匹配类型显示不同的提示消息
+    if (match.confidence === 'exact') {
+      showExportToast(`已切换到「${match.name}」的供应链`);
+    } else if (match.confidence === 'alias') {
+      showExportToast(`「${match.alias}」是「${match.name}」的关联实体，已切换`);
+    } else if (match.confidence === 'fuzzy') {
+      showExportToast(`「${match.alias}」匹配到「${match.name}」，已切换`);
+    }
+    return;
+  }
+
+  // 不是500强，显示提示
+  const cleanName = params.name.replace(/^⚠\s*/, '');
+  const nodeTypeLabel = m.type ? `[${m.type}]` : '';
+  showExportToast(`「${cleanName}」${nodeTypeLabel} 不在财富500强榜单中`);
+}
+
+// ===== 导出为图片 =====
+function exportSCImage() {
+  if (!scChartData || !mainChart) return;
+  const url = mainChart.getDataURL({
+    type: 'png',
+    pixelRatio: 2,
+    backgroundColor: '#fff'
+  });
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${currentCompany}_供应链结构_${currentYear}年.png`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  showExportToast('图片已导出');
+}
+
+// ===== 导出为JSON =====
+function exportSCJSON() {
+  if (!scChartData) return;
+  const { nodes, links, nodeMeta, sc, stats, resilience } = scChartData;
+  const exportData = {
+    company: currentCompany,
+    year: currentYear,
+    resilience: resilience,
+    statistics: stats,
+    description: sc.description || '',
+    nodes: nodes.map(n => ({
+      name: n.name,
+      depth: n.depth,
+      type: nodeMeta[n.name]?.type || '',
+      estimatedValue: nodeMeta[n.name]?.value || 0,
+      esgRisk: getESGRiskForNode(nodeMeta[n.name]) || null,
+    })),
+    links: links.map(l => ({
+      source: l.source,
+      target: l.target,
+      value: l.value,
+      sourceType: nodeMeta[l.source]?.type || '',
+      targetType: nodeMeta[l.target]?.type || '',
+    })),
+    bottlenecks: sc.bottlenecks || [],
+    supplyChainData: {
+      upstream: sc.upstream || '',
+      keySuppliers: sc.key_suppliers || '',
+      products: sc.products || '',
+      services: sc.services || '',
+      brands: sc.brands || '',
+      subsidiaries: sc.subsidiaries || '',
+      downstream: sc.downstream || '',
+      parentCompany: sc.parent_company || '',
+    }
+  };
+  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${currentCompany}_供应链数据_${currentYear}年.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showExportToast('JSON数据已导出');
+}
+
+// ===== 显示导出提示 =====
+function showExportToast(msg) {
+  const toast = document.getElementById('scExportToast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 2500);
+}
+
+// ===== 地理分布分析 =====
+function getSCGeography(sc, nodeMeta) {
+  const regions = {
+    '中国': 0, '美国': 0, '日本': 0, '韩国': 0, '欧洲': 0, '其他': 0
+  };
+  const regionColors = {
+    '中国': '#ef4444', '美国': '#3b82f6', '日本': '#f59e0b',
+    '韩国': '#6366f1', '欧洲': '#10b981', '其他': '#94a3b8'
+  };
+  // 分析上游和供应商的地理分布
+  const allText = `${sc.upstream || ''} ${sc.key_suppliers || ''} ${sc.downstream || ''}`;
+  // 关键词匹配
+  const patterns = {
+    '中国': ['中国', '华为', '比亚迪', '宁德时代', '富士康', '鸿海', '台积电', '联想', '腾讯', '阿里', '中石化', '中石油'],
+    '美国': ['美国', '苹果', '微软', '谷歌', '亚马逊', '英特尔', '高通', '博通', '美光', '康宁', '宝洁', '可口可乐', '联合利华'],
+    '日本': ['日本', '索尼', '丰田', '本田', '松下', '东芝', '日立', '三菱', '电装', '普利司通'],
+    '韩国': ['韩国', '三星', 'LG', 'SK', '现代', '起亚'],
+    '欧洲': ['德国', '法国', '英国', '荷兰', '瑞士', '博世', '大陆', '西门子', '巴斯夫', '诺基亚', '爱立信', 'ABB', '林德'],
+  };
+  for (const [region, keywords] of Object.entries(patterns)) {
+    keywords.forEach(kw => {
+      const matches = allText.match(new RegExp(kw, 'g'));
+      if (matches) regions[region] += matches.length;
+    });
+  }
+  // 如果没有匹配到，基于企业总部推断
+  const total = Object.values(regions).reduce((a, b) => a + b, 0);
+  if (total === 0) {
+    const country = scChartData?.nodeMeta?.[currentCompany]?.country || '';
+    if (country.includes('中国')) regions['中国'] = 3;
+    else if (country.includes('美国')) regions['美国'] = 3;
+    else if (country.includes('日本')) regions['日本'] = 3;
+    else regions['其他'] = 3;
+  }
+  return { regions, colors: regionColors, total: Math.max(total, 3) };
+}
+
+// ===== 同业供应链对比 =====
+function renderPeerSupplyChain() {
+  if (!currentCompany) return;
+  const yearData = INCOME_SANKEY_DATA[currentYear];
+  if (!yearData) return;
+  const myDetail = yearData[currentCompany]?.details;
+  if (!myDetail) return;
+  const industry = myDetail.sub_industry;
+  const container = document.getElementById('peerSCCompare');
+  if (!container) return;
+
+  // 找同行业企业
+  const peers = [];
+  for (const [name, data] of Object.entries(yearData)) {
+    if (data.details.sub_industry === industry) {
+      const sc = (typeof SUPPLY_CHAIN_DATA !== 'undefined') ? SUPPLY_CHAIN_DATA[name] : null;
+      if (sc) {
+        const stats = {
+          upstream: (sc.upstream || '').split(/[、；;]/).filter(s => s.trim().length > 1).length,
+          suppliers: (sc.key_suppliers || '').split(/[、,，]/).filter(s => s.trim().length > 1).length,
+          products: (sc.products || '').split(/[、,，]/).filter(s => s.trim().length > 1).length,
+          services: (sc.services || '').split(/[、,，]/).filter(s => s.trim().length > 1).length,
+          downstream: (sc.downstream || '').split(/[、；;]/).filter(s => s.trim().length > 1).length,
+          bn_high: (sc.bottlenecks || []).filter(b => b.severity === 'high').length,
+          bn_medium: (sc.bottlenecks || []).filter(b => b.severity === 'medium').length,
+        };
+        stats.brands = (sc.brands || '').split(/[、,，]/).filter(s => s.trim().length > 1).length;
+        stats.subsidiaries = (sc.subsidiaries || '').split(/[、,，]/).filter(s => s.trim().length > 1).length;
+        const resilience = calcResilienceScore(sc, stats);
+        peers.push({ name, rank: data.details.rank, sc, stats, resilience });
+      }
+    }
+  }
+  peers.sort((a, b) => a.rank - b.rank);
+  const topPeers = peers.slice(0, 15);
+
+  if (topPeers.length < 2) {
+    container.innerHTML = '';
+    return;
+  }
+
+  container.innerHTML = `
+    <h3>🔗 供应链韧性对比 · ${industry}</h3>
+    <table class="sc-peer-sc-table">
+      <thead>
+        <tr>
+          <th>排名</th>
+          <th>企业</th>
+          <th class="num">韧性分</th>
+          <th class="num">上游</th>
+          <th class="num">供应商</th>
+          <th class="num">产品</th>
+          <th class="num">下游</th>
+          <th class="num">高危</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${topPeers.map(p => {
+          const isCurrent = p.name === currentCompany;
+          return `<tr class="${isCurrent ? 'current' : ''}" data-name="${p.name}">
+            <td>${p.rank}</td>
+            <td>${p.name}${isCurrent ? ' ⬅' : ''}</td>
+            <td class="num"><span class="resilience-dot" style="background:${p.resilience.color}">${p.resilience.score}</span></td>
+            <td class="num">${p.stats.upstream + p.stats.suppliers}</td>
+            <td class="num">${p.stats.suppliers}</td>
+            <td class="num">${p.stats.products + p.stats.services}</td>
+            <td class="num">${p.stats.downstream}</td>
+            <td class="num" style="color:${p.stats.bn_high > 0 ? '#ef4444' : 'var(--muted)'}">${p.stats.bn_high || '—'}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  `;
+
+  // 点击切换企业
+  container.querySelectorAll('tbody tr').forEach(tr => {
+    tr.addEventListener('click', () => {
+      const name = tr.dataset.name;
+      if (name && name !== currentCompany) {
+        document.getElementById('searchInput').value = name;
+        renderChart(name);
+      }
+    });
+  });
+}
+
+// ===== 动态图例切换 =====
+function updateLegendForTab(tab) {
+  const bar = document.getElementById('legendBar');
+  const toolbar = document.getElementById('scToolbar');
+  if (!bar) return;
+  if (tab === 'supplychain') {
+    bar.innerHTML = `
+      <div class="legend-item"><div class="legend-dot" style="background:#3b82f6"></div>上游原材料</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#6366f1"></div>关键供应商</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#1e293b"></div>核心企业</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#10b981"></div>产品</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#14b8a6"></div>服务</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#a855f7"></div>品牌</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#64748b"></div>子公司</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div>下游市场</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#ef4444"></div>高危卡脖子</div>
+    `;
+    if (toolbar) toolbar.classList.add('show');
+  } else {
+    bar.innerHTML = `
+      <div class="legend-item"><div class="legend-dot" style="background:#3b82f6"></div>营收</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#10b981"></div>利润</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#ef4444"></div>成本/税费</div>
+    `;
+    if (toolbar) toolbar.classList.remove('show');
+  }
+}
+
+// ===== 供应链信息栏 =====
+function updateSCInfoBar(stats, sc, resilience) {
+  const bar = document.getElementById('scInfoBar');
+  if (!bar) return;
+  if (!stats || !sc) {
+    bar.classList.remove('show');
+    bar.innerHTML = '';
+    return;
+  }
+  const bnTotal = stats.bn_high + stats.bn_medium;
+  let riskHtml = '';
+  if (bnTotal > 0) {
+    riskHtml = `<div class="sc-info-item">
+      <div class="sc-info-label">卡脖子风险</div>
+      <div class="sc-info-risk">
+        ${stats.bn_high > 0 ? `<span class="sc-risk-badge high">${stats.bn_high} 高危</span>` : ''}
+        ${stats.bn_medium > 0 ? `<span class="sc-risk-badge medium">${stats.bn_medium} 中等</span>` : ''}
+      </div>
+    </div>`;
+  }
+  const desc = sc.description ? (sc.description.length > 120 ? sc.description.slice(0, 120) + '…' : sc.description) : '';
+  let resilienceHtml = '';
+  if (resilience) {
+    resilienceHtml = `<div class="sc-info-sep"></div>
+    <div class="sc-info-item">
+      <div class="sc-info-label">韧性评分</div>
+      <div class="sc-info-value" style="color:${resilience.color}">${resilience.score}<span class="unit"> /100 (${resilience.grade})</span></div>
+    </div>`;
+  }
+  bar.innerHTML = `
+    <div class="sc-info-grid">
+      <div class="sc-info-item"><div class="sc-info-label">上游原材料</div><div class="sc-info-value">${stats.upstream}<span class="unit"> 项</span></div></div>
+      <div class="sc-info-sep"></div>
+      <div class="sc-info-item"><div class="sc-info-label">关键供应商</div><div class="sc-info-value">${stats.suppliers}<span class="unit"> 家</span></div></div>
+      <div class="sc-info-sep"></div>
+      <div class="sc-info-item"><div class="sc-info-label">产品</div><div class="sc-info-value">${stats.products}<span class="unit"> 项</span></div></div>
+      <div class="sc-info-sep"></div>
+      <div class="sc-info-item"><div class="sc-info-label">服务</div><div class="sc-info-value">${stats.services}<span class="unit"> 项</span></div></div>
+      <div class="sc-info-sep"></div>
+      <div class="sc-info-item"><div class="sc-info-label">品牌</div><div class="sc-info-value">${stats.brands}<span class="unit"> 个</span></div></div>
+      <div class="sc-info-sep"></div>
+      <div class="sc-info-item"><div class="sc-info-label">子公司</div><div class="sc-info-value">${stats.subsidiaries}<span class="unit"> 家</span></div></div>
+      <div class="sc-info-sep"></div>
+      <div class="sc-info-item"><div class="sc-info-label">下游市场</div><div class="sc-info-value">${stats.downstream}<span class="unit"> 个</span></div></div>
+      ${bnTotal > 0 ? '<div class="sc-info-sep"></div>' : ''}
+      ${riskHtml}
+      ${resilienceHtml}
+    </div>
+    ${desc ? `<div class="sc-info-desc">${desc}</div>` : ''}
+  `;
+  bar.classList.add('show');
+}
+
+// ===== 渲染主桑基图 =====
+function renderChart(companyName) {
+  const yearData = INCOME_SANKEY_DATA[currentYear];
+  if (!yearData || !yearData[companyName]) {
+    document.getElementById('noData').style.display = 'flex';
+    return;
+  }
+  const data = yearData[companyName];
+  const d = data.details;
+  currentCompany = companyName;
+
+  document.getElementById('noData').style.display = 'none';
+  document.getElementById('chartTitle').style.display = 'block';
+  document.getElementById('titleCompany').textContent = companyName;
+  document.getElementById('titleMeta').textContent =
+    `${d.country} · ${d.sub_industry} · 第${d.rank}名 · ${currentYear}财年`;
+
+  // 数据来源标签
+  const badge = document.getElementById('dataSourceBadge');
+  badge.style.display = 'inline-block';
+  if (d.data_source === 'SEC EDGAR') {
+    badge.textContent = '✓ 美国证监会真实数据';
+    badge.className = 'data-source-badge real';
+  } else {
+    badge.textContent = '行业均值估算';
+    badge.className = 'data-source-badge estimate';
+  }
+
+  // 根据当前Tab决定渲染哪个桑基图
+  if (currentTab === 'supplychain') {
+    renderSupplyChainChart();
+  } else {
+    renderIncomeSankey();
+  }
+
+  // 渲染各Tab内容
+  renderOverview(d, companyName);
+  renderTrendCharts();
+  renderPeerTable();
+  renderPeerSupplyChain();
+  renderInsights(d, companyName);
+  renderSupplyChain(companyName);
+
+  // 显示侧边面板
+  document.getElementById('sidePanel').classList.add('open');
+  document.getElementById('chartWrap').classList.add('panel-open');
+  setTimeout(() => mainChart.resize(), 360);
+}
+
+// ===== Tab: 概览 =====
+function renderOverview(d, companyName) {
+  document.getElementById('panelTitle').textContent = d.name;
+  document.getElementById('panelSubtitle').textContent =
+    `${d.country} · ${d.sub_industry} · 第${d.rank}名 · ${currentYear}财年`;
+
+  // 财务卡片（带同比）
+  const revYoY = calcYoY(companyName, 'revenue', currentYear);
+  const netYoY = calcYoY(companyName, 'net_profit', currentYear);
+  const gpYoY = calcYoY(companyName, 'gross_profit', currentYear);
+  const opYoY = calcYoY(companyName, 'operating_profit', currentYear);
+
+  document.getElementById('financeGrid').innerHTML = `
+    <div class="fin-card">
+      <div class="label">营业收入${yoyTag(revYoY)}</div>
+      <div class="value blue">${fmtNum(d.revenue)}<span class="unit"> 亿美元</span></div>
+    </div>
+    <div class="fin-card">
+      <div class="label">净利润${yoyTag(netYoY)}</div>
+      <div class="value ${d.net_profit>=0?'green':'red'}">${fmtNum(d.net_profit)}<span class="unit"> 亿美元</span></div>
+    </div>
+    <div class="fin-card">
+      <div class="label">毛利润${yoyTag(gpYoY)}</div>
+      <div class="value green">${fmtNum(d.gross_profit)}<span class="unit"> 亿美元</span></div>
+    </div>
+    <div class="fin-card">
+      <div class="label">运营利润${yoyTag(opYoY)}</div>
+      <div class="value ${d.operating_profit>=0?'green':'red'}">${fmtNum(d.operating_profit)}<span class="unit"> 亿美元</span></div>
+    </div>
+  `;
+
+  // 利润表流程表（带同比）
+  const rdYoY = calcYoY(companyName, 'rd_expense', currentYear);
+  const sgaYoY = calcYoY(companyName, 'sga_expense', currentYear);
+  const taxYoY = calcYoY(companyName, 'tax', currentYear);
+
+  document.getElementById('flowTable').innerHTML = `
+    <h3>利润表流程</h3>
+    <table>
+      <tr><th>项目</th><th class="num">金额（亿美元）</th><th class="num">占营收</th><th class="num">同比</th></tr>
+      <tr class="revenue"><td>营业收入</td><td class="amount">${fmtNum(d.revenue)}</td><td class="amount">100.0%</td><td class="amount">${revYoY!=null?(revYoY>=0?'+':'')+revYoY.toFixed(1)+'%':'—'}</td></tr>
+      <tr class="cost"><td>营业成本</td><td class="amount">-${fmtNum(d.cost_of_revenue)}</td><td class="amount">${(d.cost_of_revenue/d.revenue*100).toFixed(1)}%</td><td class="amount">${calcYoY(companyName,'cost_of_revenue',currentYear)!=null?(calcYoY(companyName,'cost_of_revenue',currentYear)>=0?'+':'')+calcYoY(companyName,'cost_of_revenue',currentYear).toFixed(1)+'%':'—'}</td></tr>
+      <tr class="profit"><td>毛利润</td><td class="amount">${fmtNum(d.gross_profit)}</td><td class="amount">${(d.gross_profit/d.revenue*100).toFixed(1)}%</td><td class="amount">${gpYoY!=null?(gpYoY>=0?'+':'')+gpYoY.toFixed(1)+'%':'—'}</td></tr>
+      <tr class="cost"><td>研发费用</td><td class="amount">-${fmtNum(d.rd_expense)}</td><td class="amount">${(d.rd_expense/d.revenue*100).toFixed(1)}%</td><td class="amount">${rdYoY!=null?(rdYoY>=0?'+':'')+rdYoY.toFixed(1)+'%':'—'}</td></tr>
+      <tr class="cost"><td>销售管理费用</td><td class="amount">-${fmtNum(d.sga_expense)}</td><td class="amount">${(d.sga_expense/d.revenue*100).toFixed(1)}%</td><td class="amount">${sgaYoY!=null?(sgaYoY>=0?'+':'')+sgaYoY.toFixed(1)+'%':'—'}</td></tr>
+      <tr class="profit"><td>运营利润</td><td class="amount">${fmtNum(d.operating_profit)}</td><td class="amount">${(d.operating_profit/d.revenue*100).toFixed(1)}%</td><td class="amount">${opYoY!=null?(opYoY>=0?'+':'')+opYoY.toFixed(1)+'%':'—'}</td></tr>
+      <tr class="cost"><td>所得税</td><td class="amount">-${fmtNum(d.tax)}</td><td class="amount">${(d.tax/d.revenue*100).toFixed(1)}%</td><td class="amount">${taxYoY!=null?(taxYoY>=0?'+':'')+taxYoY.toFixed(1)+'%':'—'}</td></tr>
+      <tr class="profit"><td><b>净利润</b></td><td class="amount"><b>${fmtNum(d.net_profit)}</b></td><td class="amount"><b>${(d.net_profit/d.revenue*100).toFixed(1)}%</b></td><td class="amount"><b>${netYoY!=null?(netYoY>=0?'+':'')+netYoY.toFixed(1)+'%':'—'}</b></td></tr>
+    </table>
+  `;
+
+  // 关键指标
+  const gmYoY = calcYoY(companyName, 'gross_margin', currentYear);
+  const omYoY = calcYoY(companyName, 'operating_margin', currentYear);
+  const nmYoY = calcYoY(companyName, 'net_margin', currentYear);
+
+  document.getElementById('metricsSection').innerHTML = `
+    <h3>关键财务指标</h3>
+    <div class="metric-row"><span class="ml">毛利率</span><span class="mv" style="color:var(--green)">${d.gross_margin}%${gmYoY!=null?` <span style="font-size:10px;color:${gmYoY>=0?'var(--green)':'var(--red)'}">${gmYoY>=0?'↑':'↓'}${Math.abs(gmYoY).toFixed(1)}pp</span>`:''}</span></div>
+    <div class="metric-row"><span class="ml">运营利润率</span><span class="mv">${d.operating_margin}%${omYoY!=null?` <span style="font-size:10px;color:${omYoY>=0?'var(--green)':'var(--red)'}">${omYoY>=0?'↑':'↓'}${Math.abs(omYoY).toFixed(1)}pp</span>`:''}</span></div>
+    <div class="metric-row"><span class="ml">净利率</span><span class="mv" style="color:${d.net_margin>=0?'var(--green)':'var(--red)'}">${d.net_margin}%${nmYoY!=null?` <span style="font-size:10px;color:${nmYoY>=0?'var(--green)':'var(--red)'}">${nmYoY>=0?'↑':'↓'}${Math.abs(nmYoY).toFixed(1)}pp</span>`:''}</span></div>
+    <div class="metric-row"><span class="ml">有效税率</span><span class="mv">${d.effective_tax_rate}%</span></div>
+    <div class="metric-row"><span class="ml">净资产收益率</span><span class="mv">${d.roe}%</span></div>
+    <div class="metric-row"><span class="ml">总资产</span><span class="mv">${(d.assets * 10).toFixed(0)} 亿美元</span></div>
+    <div class="metric-row"><span class="ml">股东权益</span><span class="mv">${(d.equity * 10).toFixed(0)} 亿美元</span></div>
+    <div class="metric-row"><span class="ml">员工数</span><span class="mv">${(d.employees||0).toLocaleString()} 人</span></div>
+    <div class="metric-row"><span class="ml">资产周转率</span><span class="mv">${d.assets>0?(d.revenue/d.assets).toFixed(2):'—'} 倍</span></div>
+    <div class="metric-row"><span class="ml">权益乘数</span><span class="mv">${d.equity>0?(d.assets/d.equity).toFixed(2):'—'} 倍</span></div>
+    <div class="data-source-row">
+      <span>数据来源</span>
+      <span style="font-weight:600;color:${d.data_source==='SEC EDGAR'?'var(--green)':'var(--muted)'}">${d.data_source === 'SEC EDGAR' ? '✓ 美国证监会真实数据' : '行业均值估算'}</span>
+    </div>
+  `;
+}
+
+// ===== Tab: 趋势 =====
+function renderTrendCharts() {
+  if (!currentCompany || !trendChart) return;
+
+  const revSeries = getMultiYearData(currentCompany, 'revenue');
+  const netSeries = getMultiYearData(currentCompany, 'net_profit');
+  const gpSeries = getMultiYearData(currentCompany, 'gross_profit');
+  const opSeries = getMultiYearData(currentCompany, 'operating_profit');
+
+  const fmtYi = (v) => v != null ? (v * 10).toFixed(1) : '-';
+  const labels = YEARS.map(y => y + '年');
+
+  // 营收与利润趋势
+  trendChart.setOption({
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: '#fff', borderColor: '#e2e8f0', borderWidth: 1,
+      textStyle: {color: '#1e293b', fontSize: 12},
+      formatter: (params) => {
+        let html = `<b>${params[0].axisValue}</b><br/>`;
+        params.forEach(p => {
+          const val = p.value;
+          if (val != null) {
+            html += `${p.marker} ${p.seriesName}: <b>${(val * 10).toFixed(1)}亿美元</b><br/>`;
+          }
+        });
+        return html;
+      }
+    },
+    legend: {data: ['营业收入', '毛利润', '运营利润', '净利润'], bottom: 0, textStyle: {fontSize: 10}, itemWidth: 12, itemHeight: 8},
+    grid: {left: 45, right: 15, top: 15, bottom: 35},
+    xAxis: {type: 'category', data: labels, axisLabel: {fontSize: 11}, axisLine: {lineStyle: {color: '#e2e8f0'}}},
+    yAxis: {type: 'value', axisLabel: {fontSize: 10, formatter: v => (v * 10).toFixed(0)}, splitLine: {lineStyle: {color: '#f1f5f9'}}},
+    series: [
+      {name: '营业收入', type: 'line', data: revSeries, smooth: true, symbol: 'circle', symbolSize: 6, lineStyle: {width: 2.5}, itemStyle: {color: '#3b82f6'}, areaStyle: {color: 'rgba(59,130,246,0.06)'}},
+      {name: '毛利润', type: 'line', data: gpSeries, smooth: true, symbol: 'circle', symbolSize: 5, lineStyle: {width: 2}, itemStyle: {color: '#10b981'}},
+      {name: '运营利润', type: 'line', data: opSeries, smooth: true, symbol: 'circle', symbolSize: 5, lineStyle: {width: 2}, itemStyle: {color: '#059669'}},
+      {name: '净利润', type: 'line', data: netSeries, smooth: true, symbol: 'circle', symbolSize: 5, lineStyle: {width: 2}, itemStyle: {color: '#f59e0b'}},
+    ]
+  }, true);
+
+  // 利润率趋势
+  const gmSeries = getMultiYearData(currentCompany, 'gross_margin');
+  const omSeries = getMultiYearData(currentCompany, 'operating_margin');
+  const nmSeries = getMultiYearData(currentCompany, 'net_margin');
+
+  marginChart.setOption({
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: '#fff', borderColor: '#e2e8f0', borderWidth: 1,
+      textStyle: {color: '#1e293b', fontSize: 12},
+      formatter: (params) => {
+        let html = `<b>${params[0].axisValue}</b><br/>`;
+        params.forEach(p => {
+          if (p.value != null) html += `${p.marker} ${p.seriesName}: <b>${p.value.toFixed(1)}%</b><br/>`;
+        });
+        return html;
+      }
+    },
+    legend: {data: ['毛利率', '运营利润率', '净利率'], bottom: 0, textStyle: {fontSize: 10}, itemWidth: 12, itemHeight: 8},
+    grid: {left: 40, right: 15, top: 15, bottom: 35},
+    xAxis: {type: 'category', data: labels, axisLabel: {fontSize: 11}, axisLine: {lineStyle: {color: '#e2e8f0'}}},
+    yAxis: {type: 'value', axisLabel: {fontSize: 10, formatter: '{value}%'}, splitLine: {lineStyle: {color: '#f1f5f9'}}},
+    series: [
+      {name: '毛利率', type: 'line', data: gmSeries, smooth: true, symbol: 'circle', symbolSize: 5, lineStyle: {width: 2}, itemStyle: {color: '#10b981'}},
+      {name: '运营利润率', type: 'line', data: omSeries, smooth: true, symbol: 'circle', symbolSize: 5, lineStyle: {width: 2}, itemStyle: {color: '#059669'}},
+      {name: '净利率', type: 'line', data: nmSeries, smooth: true, symbol: 'circle', symbolSize: 5, lineStyle: {width: 2}, itemStyle: {color: '#f59e0b'}},
+    ]
+  }, true);
+
+  // 趋势摘要数字
+  const revFirst = revSeries[0], revLast = revSeries[revSeries.length - 1];
+  const netFirst = netSeries[0], netLast = netSeries[netSeries.length - 1];
+  const revChange = (revFirst && revLast) ? ((revLast - revFirst) / Math.abs(revFirst) * 100) : null;
+  const netChange = (netFirst && netLast) ? ((netLast - netFirst) / Math.abs(netFirst) * 100) : null;
+  const gmChange = (gmSeries[0] != null && gmSeries[gmSeries.length-1] != null) ? (gmSeries[gmSeries.length-1] - gmSeries[0]) : null;
+  const nmChange = (nmSeries[0] != null && nmSeries[nmSeries.length-1] != null) ? (nmSeries[nmSeries.length-1] - nmSeries[0]) : null;
+
+  document.getElementById('trendMetrics').innerHTML = `
+    <div class="trend-metric">
+      <div class="tm-label">营收累计变化</div>
+      <div class="tm-value" style="color:${revChange>=0?'var(--green)':'var(--red)'}">${revChange!=null?(revChange>=0?'+':'')+revChange.toFixed(1)+'%':'—'}</div>
+      <div class="tm-change">2022→2025</div>
+    </div>
+    <div class="trend-metric">
+      <div class="tm-label">利润累计变化</div>
+      <div class="tm-value" style="color:${netChange>=0?'var(--green)':'var(--red)'}">${netChange!=null?(netChange>=0?'+':'')+netChange.toFixed(1)+'%':'—'}</div>
+      <div class="tm-change">2022→2025</div>
+    </div>
+    <div class="trend-metric">
+      <div class="tm-label">毛利率变化</div>
+      <div class="tm-value" style="color:${gmChange>=0?'var(--green)':'var(--red)'}">${gmChange!=null?(gmChange>=0?'+':'')+gmChange.toFixed(1)+'pp':'—'}</div>
+      <div class="tm-change">2022→2025</div>
+    </div>
+    <div class="trend-metric">
+      <div class="tm-label">净利率变化</div>
+      <div class="tm-value" style="color:${nmChange>=0?'var(--green)':'var(--red)'}">${nmChange!=null?(nmChange>=0?'+':'')+nmChange.toFixed(1)+'pp':'—'}</div>
+      <div class="tm-change">2022→2025</div>
+    </div>
+  `;
+}
+
+// ===== Tab: 同业对比 =====
+function renderPeerTable() {
+  if (!currentCompany) return;
+  const yearData = INCOME_SANKEY_DATA[currentYear];
+  if (!yearData) return;
+
+  const myDetail = yearData[currentCompany]?.details;
+  if (!myDetail) return;
+
+  const industry = myDetail.sub_industry;
+  document.getElementById('peerTitle').textContent = `同行业对比 · ${industry}（${currentYear}年）`;
+
+  // 找同行业企业
+  const peers = [];
+  for (const [name, data] of Object.entries(yearData)) {
+    if (data.details.sub_industry === industry) {
+      peers.push({ name, ...data.details });
+    }
+  }
+  peers.sort((a, b) => b.revenue - a.revenue);
+
+  // 限制最多展示30家
+  const topPeers = peers.slice(0, 30);
+
+  document.getElementById('peerTable').innerHTML = `
+    <table class="peer-table">
+      <thead>
+        <tr>
+          <th>排名</th>
+          <th>企业</th>
+          <th>国家</th>
+          <th class="num">营收</th>
+          <th class="num">净利</th>
+          <th class="num">净利率</th>
+          <th class="num">毛利率</th>
+          <th class="num">ROE</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${topPeers.map(p => {
+          const isCurrent = p.name === currentCompany;
+          const rankClass = p.rank <= 10 ? 'top10' : p.rank <= 50 ? 'top50' : p.rank <= 100 ? 'top100' : '';
+          return `<tr class="${isCurrent ? 'current' : ''}" data-name="${p.name}">
+            <td><span class="rank-badge ${rankClass}">${p.rank}</span></td>
+            <td>${p.name}${isCurrent ? ' ⬅' : ''}</td>
+            <td style="font-size:11px;color:var(--muted)">${p.country}</td>
+            <td class="num">${(p.revenue * 10).toFixed(0)}</td>
+            <td class="num" style="color:${p.net_profit >= 0 ? 'var(--green)' : 'var(--red)'}">${(p.net_profit * 10).toFixed(0)}</td>
+            <td class="num">${p.net_margin.toFixed(1)}%</td>
+            <td class="num">${p.gross_margin.toFixed(1)}%</td>
+            <td class="num">${p.roe.toFixed(1)}%</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  `;
+
+  // 点击同行企业切换
+  document.querySelectorAll('#peerTable tbody tr').forEach(tr => {
+    tr.addEventListener('click', () => {
+      const name = tr.dataset.name;
+      if (name && name !== currentCompany) {
+        document.getElementById('searchInput').value = name;
+        renderChart(name);
+      }
+    });
+  });
+}
+
+// ===== Tab: 洞察分析 =====
+function renderInsights(d, companyName) {
+  const insights = [];
+
+  // 1. 营收增长洞察
+  const revYoY = calcYoY(companyName, 'revenue', currentYear);
+  if (revYoY != null) {
+    if (revYoY > 20) {
+      insights.push({type: 'green', icon: '🚀', title: '营收高速增长', body: `本财年营业收入同比 <b>+${revYoY.toFixed(1)}%</b>，增速超过20%，处于高速增长期。`});
+    } else if (revYoY > 5) {
+      insights.push({type: 'green', icon: '📈', title: '营收稳健增长', body: `本财年营业收入同比 <b>+${revYoY.toFixed(1)}%</b>，保持稳健增长态势。`});
+    } else if (revYoY > 0) {
+      insights.push({type: 'amber', icon: '🐢', title: '营收增长放缓', body: `本财年营业收入同比仅 <b>+${revYoY.toFixed(1)}%</b>，增长动力减弱。`});
+    } else {
+      insights.push({type: 'red', icon: '📉', title: '营收下滑', body: `本财年营业收入同比 <b>${revYoY.toFixed(1)}%</b>，出现负增长，需关注业务萎缩风险。`});
+    }
+  }
+
+  // 2. 净利润增长洞察
+  const netYoY = calcYoY(companyName, 'net_profit', currentYear);
+  if (netYoY != null) {
+    if (netYoY > 30) {
+      insights.push({type: 'green', icon: '💰', title: '利润大幅提升', body: `净利润同比 <b>+${netYoY.toFixed(1)}%</b>，远超营收增速，盈利能力显著改善。`});
+    } else if (netYoY > 0 && revYoY != null && netYoY > revYoY) {
+      insights.push({type: 'green', icon: '✨', title: '利润增速跑赢营收', body: `净利润增速 <b>+${netYoY.toFixed(1)}%</b> 超过营收增速 <b>+${revYoY.toFixed(1)}%</b>，经营杠杆正向释放。`});
+    } else if (netYoY < 0 && revYoY != null && revYoY > 0) {
+      insights.push({type: 'red', icon: '⚠️', title: '增收不增利', body: `营收增长 <b>+${revYoY.toFixed(1)}%</b> 但净利润下降 <b>${netYoY.toFixed(1)}%</b>，成本压力侵蚀盈利。`});
+    } else if (netYoY < 0) {
+      insights.push({type: 'red', icon: '🔴', title: '利润下滑', body: `净利润同比下降 <b>${Math.abs(netYoY).toFixed(1)}%</b>，盈利能力恶化。`});
+    }
+  }
+
+  // 3. 利润率水平洞察
+  if (d.net_margin > 20) {
+    insights.push({type: 'green', icon: '💎', title: '超高净利率', body: `净利率达 <b>${d.net_margin.toFixed(1)}%</b>，盈利能力极强，具有显著定价权或规模优势。`});
+  } else if (d.net_margin > 10) {
+    insights.push({type: 'green', icon: '👍', title: '健康净利率', body: `净利率 <b>${d.net_margin.toFixed(1)}%</b>，高于大多数500强企业平均水平。`});
+  } else if (d.net_margin > 0 && d.net_margin < 3) {
+    insights.push({type: 'amber', icon: '⏳', title: '薄利经营', body: `净利率仅 <b>${d.net_margin.toFixed(1)}%</b>，利润空间狭窄，对成本波动高度敏感。`});
+  } else if (d.net_margin < 0) {
+    insights.push({type: 'red', icon: '🩸', title: '亏损经营', body: `净利率为 <b>${d.net_margin.toFixed(1)}%</b>，处于亏损状态。`});
+  }
+
+  // 4. 利润率变化趋势
+  const nmYoY = calcYoY(companyName, 'net_margin', currentYear);
+  const gmYoY = calcYoY(companyName, 'gross_margin', currentYear);
+  if (nmYoY != null && gmYoY != null) {
+    if (nmYoY > 2 && gmYoY > 0) {
+      insights.push({type: 'green', icon: '📊', title: '毛利率与净利率双升', body: `毛利率提升 <b>${gmYoY.toFixed(1)}pp</b>，净利率提升 <b>${nmYoY.toFixed(1)}pp</b>，盈利质量全面改善。`});
+    } else if (nmYoY < -2 && gmYoY < 0) {
+      insights.push({type: 'red', icon: '📊', title: '毛利率与净利率双降', body: `毛利率下降 <b>${Math.abs(gmYoY).toFixed(1)}pp</b>，净利率下降 <b>${Math.abs(nmYoY).toFixed(1)}pp</b>，盈利能力承压。`});
+    } else if (gmYoY < 0 && nmYoY > 0) {
+      insights.push({type: 'amber', icon: '⚖️', title: '毛利率降但净利率升', body: `毛利率下降 <b>${Math.abs(gmYoY).toFixed(1)}pp</b>，但通过费用管控实现净利率提升 <b>${nmYoY.toFixed(1)}pp</b>。`});
+    }
+  }
+
+  // 5. 研发投入洞察
+  const rdPct = (d.rd_expense / d.revenue * 100);
+  if (rdPct > 15) {
+    insights.push({type: 'purple', icon: '🔬', title: '重研发驱动', body: `研发投入占营收 <b>${rdPct.toFixed(1)}%</b>，属高研发投入型企业，长期竞争力有望持续增强。`});
+  } else if (rdPct > 5) {
+    insights.push({type: 'purple', icon: '🧪', title: '稳健研发投入', body: `研发投入占营收 <b>${rdPct.toFixed(1)}%</b>，注重技术创新。`});
+  }
+
+  // 6. 税率洞察
+  if (d.effective_tax_rate > 40) {
+    insights.push({type: 'amber', icon: '🏛️', title: '有效税率偏高', body: `有效税率达 <b>${d.effective_tax_rate.toFixed(1)}%</b>，显著压缩了净利润空间。`});
+  } else if (d.effective_tax_rate < 15 && d.effective_tax_rate > 0) {
+    insights.push({type: 'green', icon: '🌍', title: '有效税率偏低', body: `有效税率仅 <b>${d.effective_tax_rate.toFixed(1)}%</b>，可能受益于税收优惠或海外利润布局。`});
+  }
+
+  // 7. 资产效率洞察
+  const assetTurn = d.assets > 0 ? d.revenue / d.assets : 0;
+  if (assetTurn > 1.0) {
+    insights.push({type: 'green', icon: '⚡', title: '资产周转高效', body: `资产周转率 <b>${assetTurn.toFixed(2)}倍</b>，资产利用效率高，属轻资产运营模式。`});
+  } else if (assetTurn < 0.3 && assetTurn > 0) {
+    insights.push({type: 'amber', icon: '🏭', title: '重资产模式', body: `资产周转率仅 <b>${assetTurn.toFixed(2)}倍</b>，属重资产运营，需关注资产回报率。`});
+  }
+
+  // 8. 杠杆洞察
+  const leverage = d.equity > 0 ? d.assets / d.equity : 0;
+  if (leverage > 5) {
+    insights.push({type: 'red', icon: '⚡', title: '高财务杠杆', body: `权益乘数 <b>${leverage.toFixed(2)}倍</b>，财务杠杆较高，需关注偿债风险。`});
+  }
+
+  // 9. 同业对比洞察
+  const yearData = INCOME_SANKEY_DATA[currentYear];
+  const peers = [];
+  for (const [name, data] of Object.entries(yearData)) {
+    if (data.details.sub_industry === d.sub_industry) peers.push(data.details);
+  }
+  if (peers.length > 1) {
+    const avgMargin = peers.reduce((s, p) => s + p.net_margin, 0) / peers.length;
+    const avgRev = peers.reduce((s, p) => s + p.revenue, 0) / peers.length;
+    if (d.net_margin > avgMargin * 1.5) {
+      insights.push({type: 'green', icon: '🏆', title: '行业盈利领先', body: `净利率 <b>${d.net_margin.toFixed(1)}%</b> 远超同行业均值 <b>${avgMargin.toFixed(1)}%</b>，竞争优势突出。`});
+    } else if (d.net_margin < avgMargin * 0.5) {
+      insights.push({type: 'amber', icon: '📊', title: '利润率低于同行', body: `净利率 <b>${d.net_margin.toFixed(1)}%</b> 低于同行业均值 <b>${avgMargin.toFixed(1)}%</b>，成本效率有待改善。`});
+    }
+    if (d.revenue > avgRev * 3) {
+      insights.push({type: 'purple', icon: '👑', title: '行业规模龙头', body: `营收规模是同行业均值的 <b>${(d.revenue/avgRev).toFixed(1)}</b> 倍，在${d.sub_industry}行业中占据绝对龙头地位。`});
+    }
+  }
+
+  // 10. 排名变化洞察
+  const prevIdx = YEARS.indexOf(currentYear) - 1;
+  if (prevIdx >= 0) {
+    const prevData = INCOME_SANKEY_DATA[YEARS[prevIdx]]?.[companyName]?.details;
+    if (prevData && prevData.rank !== d.rank) {
+      const rankChange = prevData.rank - d.rank;
+      if (rankChange > 0) {
+        insights.push({type: 'green', icon: '⬆️', title: '500强排名上升', body: `世界500强排名从第 <b>${prevData.rank}</b> 名上升至第 <b>${d.rank}</b> 名，提升 <b>${rankChange}</b> 位。`});
+      } else {
+        insights.push({type: 'amber', icon: '⬇️', title: '500强排名下滑', body: `世界500强排名从第 <b>${prevData.rank}</b> 名下降至第 <b>${d.rank}</b> 名，下滑 <b>${Math.abs(rankChange)}</b> 位。`});
+      }
+    }
+  }
+
+  // 渲染洞察
+  if (insights.length === 0) {
+    document.getElementById('insightsContainer').innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center;padding:20px">暂无可生成的洞察</div>';
+    return;
+  }
+  document.getElementById('insightsContainer').innerHTML = insights.map(i => `
+    <div class="insight-card ${i.type}">
+      <div class="ic-title">${i.icon} ${i.title}</div>
+      <div class="ic-body">${i.body}</div>
+    </div>
+  `).join('');
+}
+
+// ===== Tab: 供应链 =====
+function renderSupplyChain(companyName) {
+  const sc = (typeof SUPPLY_CHAIN_DATA !== 'undefined') ? SUPPLY_CHAIN_DATA[companyName] : null;
+  if (!sc) {
+    document.getElementById('supplyChainContainer').innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center;padding:20px">暂无供应链数据</div>';
+    return;
+  }
+
+  let html = '';
+
+  // ===== 解析供应链统计数据 =====
+  function parseListLocal(str, delimiter) {
+    if (!str) return [];
+    return str.split(delimiter).map(s => s.trim()).filter(s => s && s.length > 1);
+  }
+  const upItems = parseListLocal(sc.upstream, /[、；;]/);
+  const supItems = parseListLocal(sc.key_suppliers, /[、,，]/);
+  const prodItems = parseListLocal(sc.products, /[、,，]/);
+  const svcItems = parseListLocal(sc.services, /[、,，]/);
+  const brandItems = parseListLocal(sc.brands, /[、,，]/);
+  const subItems = parseListLocal(sc.subsidiaries, /[、,，]/);
+  const dsItems = parseListLocal(sc.downstream, /[、；;]/);
+  const areaItems = parseListLocal(sc.area_served, /[、,，]/);
+  const bnItems = sc.bottlenecks || [];
+  const dsUnique = [...new Set([...dsItems, ...areaItems])];
+
+  const scStats = {
+    upstream: upItems.length, suppliers: supItems.length,
+    products: prodItems.length, services: svcItems.length,
+    brands: brandItems.length, subsidiaries: subItems.length,
+    downstream: dsUnique.length,
+    bn_high: bnItems.filter(b => b.severity === 'high').length,
+    bn_medium: bnItems.filter(b => b.severity === 'medium').length,
+  };
+
+  // ===== 韧性评分仪表盘 =====
+  const scResilience = calcResilienceScore(sc, scStats);
+  html += `
+    <div class="sc-resilience">
+      <div class="sc-resilience-gauge" style="background: conic-gradient(${scResilience.color} ${scResilience.score * 3.6}deg, #e2e8f0 0deg);">
+        <div style="width:44px;height:44px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;">
+          <span class="score" style="color:${scResilience.color}">${scResilience.score}</span>
+        </div>
+      </div>
+      <div class="sc-resilience-info">
+        <div class="sc-resilience-label">供应链韧性评分</div>
+        <div class="sc-resilience-title" style="color:${scResilience.color}">${scResilience.grade}级 · ${scResilience.score}/100</div>
+        <div class="sc-resilience-desc">${scResilience.desc}</div>
+        <div class="sc-resilience-bar">
+          <div class="sc-resilience-bar-fill" style="width:${scResilience.score}%;background:${scResilience.color}"></div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // ===== 供应链统计摘要 =====
+  html += `
+    <div class="sc-section">
+      <h3>供应链统计</h3>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">
+        <div style="text-align:center;background:#f8f9fb;border-radius:8px;padding:6px 4px"><div style="font-size:9px;color:var(--muted)">上游</div><div style="font-size:14px;font-weight:700;color:#3b82f6">${scStats.upstream + scStats.suppliers}</div></div>
+        <div style="text-align:center;background:#f8f9fb;border-radius:8px;padding:6px 4px"><div style="font-size:9px;color:var(--muted)">产品</div><div style="font-size:14px;font-weight:700;color:#10b981">${scStats.products}</div></div>
+        <div style="text-align:center;background:#f8f9fb;border-radius:8px;padding:6px 4px"><div style="font-size:9px;color:var(--muted)">服务</div><div style="font-size:14px;font-weight:700;color:#14b8a6">${scStats.services}</div></div>
+        <div style="text-align:center;background:#f8f9fb;border-radius:8px;padding:6px 4px"><div style="font-size:9px;color:var(--muted)">下游</div><div style="font-size:14px;font-weight:700;color:#f59e0b">${scStats.downstream}</div></div>
+      </div>
+    </div>
+  `;
+
+  // 1. 企业简介
+  if (sc.description) {
+    html += `<div class="sc-section"><h3>企业简介</h3><div class="sc-desc">${sc.description}</div></div>`;
+  }
+
+  // 2. 主要产品/服务/品牌
+  let tagsHtml = '';
+  if (sc.products) {
+    sc.products.split(/[、,，]/).forEach(p => {
+      p = p.trim();
+      if (p) tagsHtml += `<span class="sc-tag">${p}</span>`;
+    });
+  }
+  if (sc.services) {
+    sc.services.split(/[、,，]/).forEach(s => {
+      s = s.trim();
+      if (s) tagsHtml += `<span class="sc-tag service">${s}</span>`;
+    });
+  }
+  if (sc.brands) {
+    sc.brands.split(/[、,，]/).forEach(b => {
+      b = b.trim();
+      if (b) tagsHtml += `<span class="sc-tag brand">${b}</span>`;
+    });
+  }
+  if (tagsHtml) {
+    html += `<div class="sc-section"><h3>主要产品 / 服务 / 品牌</h3><div class="sc-product-tags">${tagsHtml}</div></div>`;
+  }
+
+  // 3. 供应链上下游
+  let chainHtml = '';
+  if (sc.upstream) {
+    chainHtml += `<div class="sc-chain-row">
+      <div class="sc-chain-icon up">⬆</div>
+      <div class="sc-chain-content">
+        <div class="sc-chain-label">上游 · 原材料 / 供应商</div>
+        <div class="sc-chain-text">${sc.upstream}</div>
+      </div>
+    </div>`;
+  }
+  if (sc.subsidiaries) {
+    chainHtml += `<div class="sc-chain-row">
+      <div class="sc-chain-icon mid">🏢</div>
+      <div class="sc-chain-content">
+        <div class="sc-chain-label">子公司 / 关联实体</div>
+        <div class="sc-chain-text">${sc.subsidiaries}</div>
+      </div>
+    </div>`;
+  }
+  if (sc.downstream) {
+    chainHtml += `<div class="sc-chain-row">
+      <div class="sc-chain-icon down">⬇</div>
+      <div class="sc-chain-content">
+        <div class="sc-chain-label">下游 · 客户 / 市场</div>
+        <div class="sc-chain-text">${sc.downstream}</div>
+      </div>
+    </div>`;
+  }
+  if (chainHtml) {
+    html += `<div class="sc-section"><h3>供应链结构</h3><div class="sc-chain">${chainHtml}</div></div>`;
+  }
+
+  // 4. 关键供应商
+  if (sc.key_suppliers) {
+    html += `<div class="sc-section"><h3>关键供应商</h3><div class="sc-suppliers">${sc.key_suppliers}</div></div>`;
+  }
+
+  // 5. 卡脖子要素
+  if (sc.bottlenecks && sc.bottlenecks.length > 0) {
+    let bnHtml = sc.bottlenecks.map(b => {
+      const sevClass = b.severity === 'high' ? 'severity-high' : 'severity-medium';
+      const sevBadge = b.severity === 'high' ? '<span class="sc-severity-badge high">高危</span>' : '<span class="sc-severity-badge medium">中等</span>';
+      const icon = b.severity === 'high' ? '🔴' : '🟡';
+      return `<div class="sc-bottleneck ${sevClass}">
+        <div class="sc-bottleneck-icon">${icon}</div>
+        <div class="sc-bottleneck-body">
+          <div class="sc-bottleneck-title">${b.element} ${sevBadge}</div>
+          <div class="sc-bottleneck-desc">${b.description}</div>
+        </div>
+      </div>`;
+    }).join('');
+    html += `<div class="sc-section"><h3>⚡ 卡脖子关键要素</h3><div class="sc-bottleneck-list">${bnHtml}</div></div>`;
+  }
+
+  // ===== ESG风险评估 =====
+  const esgRisks = [];
+  bnItems.forEach(b => {
+    esgRisks.push({
+      name: b.element,
+      level: b.severity === 'high' ? 'high' : 'medium',
+      label: b.severity === 'high' ? '高风险' : '中等风险',
+      type: '卡脖子要素'
+    });
+  });
+  upItems.forEach(item => {
+    const lower = item.toLowerCase();
+    if (lower.includes('稀土') || lower.includes('锂') || lower.includes('钴') || lower.includes('镍')) {
+      esgRisks.push({ name: item, level: 'high', label: '高环境风险', type: '上游原材料' });
+    } else if (lower.includes('半导体') || lower.includes('芯片') || lower.includes('原油') || lower.includes('矿产')) {
+      esgRisks.push({ name: item, level: 'medium', label: '中等环境风险', type: '上游原材料' });
+    }
+  });
+  if (supItems.length > 0 && supItems.length < 3) {
+    esgRisks.push({ name: '供应商集中度过高', level: 'medium', label: '供应商依赖风险', type: '集中度风险' });
+  }
+  if (esgRisks.length > 0) {
+    const esgHigh = esgRisks.filter(r => r.level === 'high').length;
+    const esgMed = esgRisks.filter(r => r.level === 'medium').length;
+    const esgRowsHtml = esgRisks.slice(0, 10).map(r => `
+      <div class="sc-esg-row">
+        <div class="sc-esg-dot" style="background:${r.level === 'high' ? '#ef4444' : '#f59e0b'}"></div>
+        <div class="sc-esg-label">${r.name}<span style="font-size:10px;color:var(--muted);margin-left:4px">(${r.type})</span></div>
+        <span class="sc-esg-badge ${r.level}">${r.label}</span>
+      </div>
+    `).join('');
+    html += `
+      <div class="sc-section">
+        <h3>🌱 ESG风险评估</h3>
+        <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+          ${esgHigh > 0 ? `<span class="sc-esg-badge high">${esgHigh} 项高风险</span>` : ''}
+          ${esgMed > 0 ? `<span class="sc-esg-badge medium">${esgMed} 项中等风险</span>` : ''}
+          ${esgHigh + esgMed === 0 ? '<span class="sc-esg-badge low">风险可控</span>' : ''}
+        </div>
+        ${esgRowsHtml}
+      </div>
+    `;
+  }
+
+  // ===== 地理分布 =====
+  const geo = getSCGeography(sc, null);
+  const geoEntries = Object.entries(geo.regions).filter(([r, c]) => c > 0).sort((a, b) => b[1] - a[1]);
+  if (geoEntries.length > 0) {
+    const geoHtml = geoEntries.map(([region, count]) => {
+      const pct = (count / geo.total * 100).toFixed(0);
+      const color = geo.colors[region] || '#94a3b8';
+      return `
+        <div class="sc-geo-item">
+          <div style="flex:1">
+            <div class="sc-geo-region">${region}</div>
+            <div class="sc-geo-count">${count} 个节点 · ${pct}%</div>
+          </div>
+          <div style="width:50px">
+            <div class="sc-geo-bar"><div class="sc-geo-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+          </div>
+        </div>
+      `;
+    }).join('');
+    html += `
+      <div class="sc-section">
+        <h3>🌍 供应链地理分布</h3>
+        <div class="sc-geo-grid">${geoHtml}</div>
+      </div>
+    `;
+  }
+
+  document.getElementById('supplyChainContainer').innerHTML = html || '<div style="color:var(--muted);font-size:13px;text-align:center;padding:20px">暂无供应链数据</div>';
+}
+
+function closePanel() {
+  document.getElementById('sidePanel').classList.remove('open');
+  document.getElementById('chartWrap').classList.remove('panel-open');
+  updateSCInfoBar(null);
+  updateLegendForTab('overview');
+  document.getElementById('scToolbar').classList.remove('show');
+  scChartData = null;
+  currentTab = 'overview';
+  setTimeout(() => mainChart && mainChart.resize(), 360);
+}
+</script>
+</body>
+</html>
