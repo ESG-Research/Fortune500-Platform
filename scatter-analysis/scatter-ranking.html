@@ -1,0 +1,1569 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>财富世界500强 — 企业榜单与散点定位</title>
+<style>
+:root {
+  --bg: #0f172a; --bg2: #1e293b; --bg3: #334155;
+  --ink: #f1f5f9; --muted: #94a3b8; --rule: #334155;
+  --accent: #3b82f6; --accent2: #10b981; --accent3: #a855f7;
+  --danger: #ef4444; --warning: #f59e0b;
+  --mfg: #a855f7; --svc: #10b981; --other: #64748b;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html { height:100%; }
+body { background:var(--bg); color:var(--ink); font-family:'Segoe UI','Microsoft YaHei',sans-serif; overflow:hidden; height:100%; }
+#app { display:flex; flex-direction:column; height:100%; }
+
+/* Header */
+.header { background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%); border-bottom:1px solid var(--rule); padding:10px 24px; display:flex; align-items:center; justify-content:space-between; flex-shrink:0; gap:16px; }
+.header h1 { font-size:17px; font-weight:700; display:flex; align-items:center; gap:8px; }
+.header h1 .icon { color:var(--accent); }
+.header .subtitle { font-size:11px; color:var(--muted); margin-top:2px; }
+.legend { display:flex; gap:14px; align-items:center; }
+.legend-item { display:flex; align-items:center; gap:5px; font-size:11px; color:var(--muted); }
+.legend-dot { width:10px; height:10px; border-radius:50%; }
+
+/* Year selector */
+.year-selector { display:flex; background:var(--bg2); border-radius:8px; padding:3px; gap:2px; }
+.year-btn { border:none; background:transparent; padding:5px 12px; border-radius:6px; cursor:pointer; font-size:12px; font-weight:600; color:var(--muted); transition:.2s; font-family:inherit; }
+.year-btn:hover { color:var(--ink); }
+.year-btn.active { background:var(--bg3); color:var(--ink); }
+
+/* Main layout */
+.main { display:flex; flex:1; overflow:hidden; }
+
+/* Left panel: company ranking */
+.left-panel { width:380px; min-width:250px; max-width:700px; background:var(--bg2); display:flex; flex-direction:column; overflow:hidden; flex-shrink:0; }
+.lp-header { padding:12px 16px; border-bottom:1px solid var(--rule); flex-shrink:0; }
+
+/* Panel resizer */
+.resizer { width:6px; background:transparent; cursor:col-resize; flex-shrink:0; position:relative; z-index:10; transition:background .15s; }
+.resizer:hover, .resizer.dragging { background:var(--accent); }
+.resizer::after { content:''; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:2px; height:30px; background:var(--bg3); border-radius:1px; transition:background .15s; }
+.resizer:hover::after, .resizer.dragging::after { background:#fff; }
+
+/* Sub-industry filter bar */
+.sub-ind-filter-bar { display:none; align-items:center; gap:8px; padding:8px 16px; background:rgba(59,130,246,.1); border-bottom:1px solid var(--rule); flex-shrink:0; }
+.sub-ind-filter-bar.show { display:flex; }
+.sub-ind-filter-bar .si-label { font-size:11px; color:var(--muted); white-space:nowrap; }
+.sub-ind-filter-bar .si-name { font-size:12px; font-weight:700; color:var(--accent); flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.sub-ind-filter-bar .si-close { background:none; border:none; color:var(--muted); cursor:pointer; font-size:14px; padding:2px 6px; border-radius:4px; transition:.2s; flex-shrink:0; }
+.sub-ind-filter-bar .si-close:hover { color:var(--danger); background:rgba(239,68,68,.1); }
+
+/* Industry summary bar */
+.ind-summary-wrap { position:relative; flex-shrink:0; }
+.ind-summary { padding:10px 16px; background:var(--bg); border-bottom:1px solid var(--rule); overflow:hidden; }
+.ind-summary-title { font-size:11px; font-weight:700; color:var(--muted); margin-bottom:6px; display:flex; align-items:center; gap:4px; }
+.ind-summary-title .sum-ind-name { color:var(--accent); }
+.ind-summary-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; }
+.ind-summary-item { background:var(--bg2); border-radius:6px; padding:6px 8px; cursor:pointer; transition:all .2s; border:1px solid transparent; }
+.ind-summary-item:hover { border-color:var(--accent); background:rgba(59,130,246,.1); transform:translateY(-1px); }
+.ind-summary-item .si-label { font-size:9px; color:var(--muted); text-transform:uppercase; }
+.ind-summary-item .si-value { font-size:13px; font-weight:700; margin-top:1px; color:var(--ink); }
+.ind-summary-item .si-value.green { color:var(--accent2); }
+.ind-summary-item .si-value.red { color:var(--danger); }
+.ind-summary-item .si-pct { font-size:9px; color:var(--warning); margin-top:2px; font-weight:600; }
+.ind-summary-item .si-yoy { font-size:9px; margin-top:1px; font-weight:600; }
+.ind-summary-item .si-yoy.up { color:var(--accent2); }
+.ind-summary-item .si-yoy.down { color:var(--danger); }
+.ind-summary-item .si-yoy.flat { color:var(--muted); }
+
+/* Summary resize handle */
+.summary-resizer { height:5px; background:transparent; cursor:ns-resize; position:relative; flex-shrink:0; }
+.summary-resizer::after { content:''; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:40px; height:2px; background:var(--bg3); border-radius:1px; transition:background .15s; }
+.summary-resizer:hover::after { background:var(--accent); }
+
+/* Chart popup cards (pie + trend) */
+.chart-popup { position:absolute; z-index:200; background:rgba(15,23,42,.97); border:1px solid var(--accent); border-radius:12px; box-shadow:0 8px 32px rgba(0,0,0,.5); display:none; flex-direction:column; overflow:hidden; min-width:280px; min-height:200px; }
+.chart-popup.show { display:flex; }
+.chart-popup.dragging { opacity:.9; box-shadow:0 12px 40px rgba(0,0,0,.6); }
+.chart-popup-header { padding:8px 12px; background:var(--bg2); border-bottom:1px solid var(--rule); display:flex; align-items:center; justify-content:space-between; cursor:move; flex-shrink:0; user-select:none; }
+.chart-popup-header .cp-title { font-size:12px; font-weight:700; color:var(--ink); display:flex; align-items:center; gap:5px; }
+.chart-popup-header .cp-close { background:none; border:none; color:var(--muted); cursor:pointer; font-size:14px; padding:2px 6px; border-radius:4px; }
+.chart-popup-header .cp-close:hover { color:var(--danger); background:rgba(239,68,68,.1); }
+.chart-popup-body { flex:1; position:relative; overflow:hidden; min-height:0; }
+.chart-popup-body .cp-chart { width:100%; height:100%; }
+.chart-popup .cp-resize { position:absolute; bottom:0; right:0; width:16px; height:16px; cursor:nwse-resize; z-index:10; }
+.chart-popup .cp-resize::after { content:''; position:absolute; bottom:2px; right:2px; width:10px; height:10px; border-right:2px solid var(--bg3); border-bottom:2px solid var(--bg3); }
+.chart-popup .cp-resize:hover::after { border-right-color:var(--accent); border-bottom-color:var(--accent); }
+.lp-title { font-size:13px; font-weight:700; color:var(--ink); margin-bottom:8px; display:flex; align-items:center; justify-content:space-between; }
+.lp-title .count { font-size:11px; color:var(--muted); font-weight:400; }
+
+/* Search */
+.search-box { position:relative; margin-bottom:8px; }
+.search-box input { width:100%; border:1px solid var(--rule); border-radius:8px; padding:7px 12px 7px 32px; font-size:12px; color:var(--ink); background:var(--bg); outline:none; transition:.2s; font-family:inherit; }
+.search-box input:focus { border-color:var(--accent); box-shadow:0 0 0 2px rgba(59,130,246,.15); }
+.search-box .icon { position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--muted); font-size:12px; pointer-events:none; }
+
+/* Industry filter */
+.ind-filter { display:flex; gap:4px; }
+.ind-btn { border:1px solid var(--rule); background:var(--bg); border-radius:6px; padding:4px 10px; cursor:pointer; font-size:11px; font-weight:600; color:var(--muted); transition:.2s; font-family:inherit; flex:1; text-align:center; }
+.ind-btn:hover { color:var(--ink); border-color:var(--bg3); }
+.ind-btn.active { color:#fff; }
+.ind-btn.active[data-ind="制造业"] { background:var(--mfg); border-color:var(--mfg); }
+.ind-btn.active[data-ind="服务业"] { background:var(--svc); border-color:var(--svc); }
+.ind-btn.active[data-ind="其他行业"] { background:var(--other); border-color:var(--other); }
+.ind-btn.active[data-ind="全部"] { background:var(--accent); border-color:var(--accent); }
+
+/* Company list */
+.company-list { flex:1; overflow-y:auto; }
+.company-list::-webkit-scrollbar { width:5px; }
+.company-list::-webkit-scrollbar-track { background:var(--bg2); }
+.company-list::-webkit-scrollbar-thumb { background:var(--rule); border-radius:3px; }
+
+.company-row { padding:8px 16px; border-bottom:1px solid rgba(51,65,85,.4); cursor:pointer; transition:background .15s; display:flex; align-items:center; gap:10px; }
+.company-row:hover { background:rgba(59,130,246,.08); }
+.company-row.highlighted { background:rgba(59,130,246,.15); border-left:3px solid var(--accent); padding-left:13px; }
+.company-rank { width:32px; height:32px; border-radius:7px; background:var(--bg); display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; color:var(--muted); flex-shrink:0; }
+.company-rank.top10 { background:var(--warning); color:#000; }
+.company-rank.top50 { background:rgba(245,158,11,.2); color:var(--warning); }
+.company-rank.top100 { background:rgba(59,130,246,.2); color:var(--accent); }
+.company-info { flex:1; min-width:0; }
+.company-name { font-size:13px; font-weight:600; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.company-meta { font-size:10px; color:var(--muted); margin-top:2px; display:flex; gap:6px; flex-wrap:wrap; }
+.company-meta .ind-tag { padding:1px 5px; border-radius:3px; font-weight:600; }
+.company-meta .ind-tag.制造业 { background:rgba(168,85,247,.15); color:var(--mfg); }
+.company-meta .ind-tag.服务业 { background:rgba(16,185,129,.15); color:var(--svc); }
+.company-meta .ind-tag.其他行业 { background:rgba(100,116,139,.15); color:var(--other); }
+.company-revenue { text-align:right; flex-shrink:0; }
+.company-revenue .val { font-size:12px; font-weight:700; color:var(--accent2); }
+.company-revenue .unit { font-size:9px; color:var(--muted); }
+
+/* Chart area */
+.chart-area { flex:1; display:flex; flex-direction:column; position:relative; min-width:0; }
+#chart { flex:1; width:100%; }
+
+/* Timeline */
+.timeline { background:var(--bg2); border-top:1px solid var(--rule); padding:8px 20px; display:flex; align-items:center; gap:12px; flex-shrink:0; }
+.play-btn { background:var(--accent); color:#fff; border:none; width:34px; height:34px; border-radius:50%; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:15px; transition:.2s; flex-shrink:0; }
+.play-btn:hover { background:#2563eb; transform:scale(1.05); }
+.play-btn:disabled { opacity:.5; cursor:not-allowed; }
+.year-display { font-size:22px; font-weight:800; color:var(--accent); min-width:60px; text-align:center; font-variant-numeric:tabular-nums; }
+.year-slider { flex:1; height:5px; background:var(--rule); border-radius:3px; position:relative; cursor:pointer; }
+.year-slider .track { position:absolute; height:100%; background:var(--accent); border-radius:3px; transition:width .5s; }
+.year-slider .thumb { position:absolute; width:16px; height:16px; background:#fff; border:3px solid var(--accent); border-radius:50%; top:50%; transform:translate(-50%,-50%); cursor:grab; transition:left .5s; }
+.year-markers { display:flex; justify-content:space-between; margin-top:4px; font-size:10px; color:var(--muted); }
+.year-markers span { cursor:pointer; transition:color .2s; }
+.year-markers span:hover { color:var(--accent); }
+.year-markers span.active { color:var(--accent); font-weight:700; }
+
+/* Detail tooltip */
+.detail-card { position:absolute; top:12px; right:12px; width:280px; background:rgba(15,23,42,.95); border:1px solid var(--accent); border-radius:10px; padding:14px 16px; z-index:50; display:none; box-shadow:0 4px 20px rgba(0,0,0,.4); cursor:move; user-select:none; }
+.detail-card.show { display:block; }
+.detail-card .dc-close { position:absolute; top:8px; right:10px; background:none; border:none; color:var(--muted); cursor:pointer; font-size:16px; }
+.detail-card .dc-title { font-size:15px; font-weight:700; color:var(--ink); margin-bottom:6px; padding-right:20px; }
+.detail-card .dc-sub { font-size:11px; color:var(--muted); margin-bottom:8px; display:flex; gap:6px; flex-wrap:wrap; }
+.detail-card .dc-sub .tag { padding:2px 6px; border-radius:4px; font-weight:600; }
+.detail-card .dc-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; cursor:default; }
+.detail-card .dc-item { background:rgba(51,65,85,.3); border-radius:6px; padding:6px 8px; }
+.detail-card .dc-label { font-size:9px; color:var(--muted); text-transform:uppercase; }
+.detail-card .dc-value { font-size:14px; font-weight:700; margin-top:1px; }
+.detail-card .dc-value.green { color:var(--accent2); }
+.detail-card .dc-value.red { color:var(--danger); }
+.detail-card .dc-value.blue { color:var(--accent); }
+.detail-card .dc-locate-hint { font-size:10px; color:var(--accent); margin-top:8px; text-align:center; cursor:default; }
+.detail-card.dragging { opacity:.85; box-shadow:0 8px 30px rgba(0,0,0,.6); cursor:grabbing; }
+
+/* Second detail card: history + YoY chart */
+.detail-card-history { width:360px; top:12px; right:308px; }
+.hc-rank-row { display:flex; gap:4px; margin-bottom:8px; cursor:default; }
+.hc-rank-item { flex:1; text-align:center; background:rgba(51,65,85,.3); border-radius:6px; padding:4px 2px; }
+.hc-rank-item .hc-rank-yr { font-size:9px; color:var(--muted); }
+.hc-rank-item .hc-rank-val { font-size:13px; font-weight:700; color:var(--ink); margin-top:1px; }
+.hc-rank-item .hc-rank-val.up { color:var(--accent2); }
+.hc-rank-item .hc-rank-val.down { color:var(--danger); }
+.hc-rank-item .hc-rank-chg { font-size:8px; margin-top:1px; }
+.hc-rank-item .hc-rank-chg.up { color:var(--accent2); }
+.hc-rank-item .hc-rank-chg.down { color:var(--danger); }
+.hc-chart-wrap { height:220px; cursor:default; }
+.hc-chart { width:100%; height:100%; }
+
+/* Portal deep-dive button (only visible when embedded in portal iframe) */
+#portalDeepDiveBtn { display:none; width:100%; margin-top:10px; padding:9px 12px; background:linear-gradient(135deg,#3b82f6 0%,#10b981 100%); color:#fff; border:none; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer; transition:all .2s; font-family:inherit; letter-spacing:.5px; }
+#portalDeepDiveBtn:hover { transform:translateY(-1px); box-shadow:0 4px 14px rgba(59,130,246,.4); }
+body.in-portal #portalDeepDiveBtn { display:block; }
+
+/* Instructions */
+.instructions { position:absolute; top:12px; left:12px; background:rgba(30,41,59,.9); border:1px solid var(--rule); border-radius:8px; padding:8px 12px; font-size:10px; color:var(--muted); z-index:50; max-width:200px; line-height:1.6; }
+.instructions strong { color:var(--accent); }
+
+/* Responsive */
+@media(max-width:1024px) {
+  .left-panel { width:300px; }
+}
+@media(max-width:768px) {
+  .left-panel { width:100%; position:absolute; z-index:200; height:100%; }
+  .left-panel.collapsed { transform:translateX(-100%); }
+  .resizer { display:none; }
+  .header h1 { font-size:13px; }
+  .legend { display:none; }
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="header">
+    <div>
+      <h1><span class="icon">●</span> 财富世界500强 — 企业榜单与散点定位</h1>
+      <div class="subtitle">数据来源：财富中文网 | 点击企业或搜索可在散点图中定位</div>
+    </div>
+    <div style="display:flex; gap:12px; align-items:center;">
+      <div class="year-selector" id="yearSelector">
+        <button class="year-btn" data-year="2022">2022</button>
+        <button class="year-btn" data-year="2023">2023</button>
+        <button class="year-btn" data-year="2024">2024</button>
+        <button class="year-btn" data-year="2025">2025</button>
+        <button class="year-btn active" data-year="2026">2026</button>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#a855f7"></div>制造业</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#10b981"></div>服务业</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#64748b"></div>其他行业</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="left-panel" id="leftPanel">
+      <div class="lp-header">
+        <div class="lp-title">
+          <span>📋 企业榜单</span>
+          <span class="count" id="companyCount">0 家</span>
+        </div>
+        <div class="search-box">
+          <span class="icon">🔍</span>
+          <input type="text" id="searchInput" placeholder="搜索企业名称…" autocomplete="off">
+        </div>
+        <div class="ind-filter" id="indFilter">
+          <button class="ind-btn active" data-ind="全部">全部</button>
+          <button class="ind-btn" data-ind="制造业">制造业</button>
+          <button class="ind-btn" data-ind="服务业">服务业</button>
+          <button class="ind-btn" data-ind="其他行业">其他</button>
+        </div>
+      </div>
+      <div class="ind-summary-wrap">
+        <div class="ind-summary" id="indSummary"></div>
+        <div class="summary-resizer" id="summaryResizer" title="上下拖拽调整高度"></div>
+      </div>
+      <div class="sub-ind-filter-bar" id="subIndFilterBar">
+        <span class="si-label">细分行业:</span>
+        <span class="si-name" id="subIndFilterName"></span>
+        <button class="si-close" id="subIndFilterClose" title="清除筛选">✕</button>
+      </div>
+      <div class="company-list" id="companyList"></div>
+    </div>
+
+    <div class="resizer" id="resizer" title="拖拽调整面板宽度"></div>
+
+    <div class="chart-area">
+      <div class="instructions">
+        <strong>操作指南</strong><br>
+        • 左侧搜索/点击企业定位<br>
+        • 滚轮缩放散点图<br>
+        • 点击散点筛选企业列表<br>
+        • 拖动分隔条调整面板<br>
+        • 拖动时间轴查看年度变化
+      </div>
+      <!-- Dynamic chart popups are created per-metric by JS -->
+      <div class="detail-card" id="detailCard">
+        <button class="dc-close" id="dcClose">✕</button>
+        <div class="dc-title" id="dcTitle"></div>
+        <div class="dc-sub" id="dcSub"></div>
+        <div class="dc-grid" id="dcGrid"></div>
+        <div class="dc-locate-hint" id="dcHint"></div>
+        <button id="portalDeepDiveBtn">🔍 查看详细信息 →</button>
+      </div>
+      <!-- Second detail card: ranking history + YoY chart -->
+      <div class="detail-card detail-card-history" id="historyCard">
+        <button class="dc-close" id="hcClose">✕</button>
+        <div class="dc-title" id="hcTitle"></div>
+        <div class="dc-sub" id="hcSub"></div>
+        <div class="hc-rank-row" id="hcRankRow"></div>
+        <div class="hc-chart-wrap"><div class="hc-chart" id="hcChart"></div></div>
+      </div>
+      <div id="chart"></div>
+      <div class="timeline">
+        <button class="play-btn" id="playBtn">▶</button>
+        <div class="year-display" id="yearDisplay">2026</div>
+        <div style="flex:1">
+          <div class="year-slider" id="yearSlider">
+            <div class="track" id="sliderTrack"></div>
+            <div class="thumb" id="sliderThumb"></div>
+          </div>
+          <div class="year-markers" id="yearMarkers">
+            <span data-year="2022">2022</span>
+            <span data-year="2023">2023</span>
+            <span data-year="2024">2024</span>
+            <span data-year="2025">2025</span>
+            <span data-year="2026" class="active">2026</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="./_shared/js/echarts.min.js"></script>
+<script src="assets/scatter_data.js"></script>
+<script src="assets/company_history.js"></script>
+<script>
+(function() {
+  'use strict';
+
+  var YEARS = ['2022','2023','2024','2025','2026'];
+  var INDUSTRY_COLORS = { '制造业':'#a855f7', '服务业':'#10b981', '其他行业':'#64748b' };
+  var INDUSTRY_BG = { '制造业':'rgba(168,85,247,0.15)', '服务业':'rgba(16,185,129,0.15)', '其他行业':'rgba(100,116,139,0.15)' };
+
+  var currentYear = '2026';
+  var chart = null;
+  var historyChart = null;
+  var isPlaying = false;
+  var playTimer = null;
+  var showTrajectory = false;
+  var selectedSubIndustry = null;
+  var highlightedCompany = null;
+  var filterIndustry = '全部';
+  var searchTerm = '';
+  var subIndustryFilter = null;
+  // ===== Dynamic Multi-Popup System =====
+  var activePopups = {}; // metric -> {pie: {el, chart}, trend: {el, chart}}
+  var METRIC_CONFIG = {
+    revenue:   { label: '营业收入', unit: '亿美元' },
+    profit:    { label: '利润',    unit: '亿美元' },
+    employees: { label: '员工数',  unit: '人' }
+  };
+  var POPUP_OFFSETS = {
+    revenue:   { px: 20, py: 60,  tx: 360, ty: 60 },
+    profit:    { px: 45, py: 95,  tx: 385, ty: 95 },
+    employees: { px: 70, py: 130, tx: 410, ty: 130 }
+  };
+
+  // Flatten company list from current year data
+  function getCompanyList(year) {
+    var yearData = SCATTER_DATA[year] || [];
+    var list = [];
+    yearData.forEach(function(item) {
+      (item.companies || []).forEach(function(c) {
+        list.push({
+          name: c.name,
+          rank: c.rank,
+          revenue: c.revenue,
+          profit: c.profit,
+          margin: c.margin,
+          country: c.country,
+          employees: c.employees,
+          industry: c.industry || item.industry,
+          subIndustry: item.sub_industry
+        });
+      });
+    });
+    list.sort(function(a,b) { return a.rank - b.rank; });
+    return list;
+  }
+
+  // ===== Left Panel: Company List =====
+  function renderCompanyList() {
+    var allCompanies = getCompanyList(currentYear);
+    var filtered = allCompanies.filter(function(c) {
+      if (filterIndustry !== '全部' && c.industry !== filterIndustry) return false;
+      if (subIndustryFilter && c.subIndustry !== subIndustryFilter) return false;
+      if (searchTerm) {
+        var term = searchTerm.toLowerCase();
+        if (c.name.toLowerCase().indexOf(term) < 0) return false;
+      }
+      return true;
+    });
+
+    document.getElementById('companyCount').textContent = filtered.length + ' 家';
+
+    // Show/hide sub-industry filter bar
+    var filterBar = document.getElementById('subIndFilterBar');
+    if (subIndustryFilter) {
+      document.getElementById('subIndFilterName').textContent = subIndustryFilter + ' (' + filtered.length + '家)';
+      filterBar.classList.add('show');
+    } else {
+      filterBar.classList.remove('show');
+    }
+
+    var html = '';
+    filtered.forEach(function(c) {
+      var rankClass = c.rank <= 10 ? 'top10' : c.rank <= 50 ? 'top50' : c.rank <= 100 ? 'top100' : '';
+      var isHighlighted = highlightedCompany && highlightedCompany.name === c.name;
+      var empStr = c.employees > 0 ? (c.employees > 10000 ? (c.employees/10000).toFixed(1)+'万' : c.employees+'') : '-';
+      html += '<div class="company-row' + (isHighlighted ? ' highlighted' : '') + '" data-name="' + c.name.replace(/"/g,'&quot;') + '">' +
+        '<div class="company-rank ' + rankClass + '">' + c.rank + '</div>' +
+        '<div class="company-info">' +
+          '<div class="company-name">' + c.name + '</div>' +
+          '<div class="company-meta">' +
+            '<span class="ind-tag ' + c.industry + '">' + c.industry + '</span>' +
+            '<span>' + c.subIndustry + '</span>' +
+            '<span>' + (c.country||'-') + '</span>' +
+          '</div>' +
+        '</div>' +
+        '<div class="company-revenue">' +
+          '<div class="val">' + c.revenue.toLocaleString() + '</div>' +
+          '<div class="unit">亿美元</div>' +
+        '</div>' +
+      '</div>';
+    });
+
+    var cl = document.getElementById('companyList');
+    if (filtered.length === 0) {
+      cl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px;">未找到匹配企业</div>';
+    } else {
+      cl.innerHTML = html;
+      cl.querySelectorAll('.company-row').forEach(function(row) {
+        row.addEventListener('click', function() {
+          var name = this.dataset.name;
+          locateCompany(name);
+        });
+      });
+    }
+
+    // Render industry summary (totals + percentage + YoY)
+    renderIndSummary(allCompanies, filtered);
+  }
+
+  // ===== Industry Summary =====
+  function renderIndSummary(allCompanies, filtered) {
+    // Sum totals for current industry filter (not affected by search/sub-industry)
+    var indFiltered = allCompanies.filter(function(c) {
+      if (filterIndustry !== '全部' && c.industry !== filterIndustry) return false;
+      return true;
+    });
+
+    var curRevenue = 0, curProfit = 0, curEmployees = 0;
+    indFiltered.forEach(function(c) {
+      curRevenue += (c.revenue || 0);
+      curProfit += (c.profit || 0);
+      curEmployees += (c.employees || 0);
+    });
+
+    // Total across all industries (for percentage)
+    var totalRevenue = 0, totalProfit = 0, totalEmployees = 0;
+    allCompanies.forEach(function(c) {
+      totalRevenue += (c.revenue || 0);
+      totalProfit += (c.profit || 0);
+      totalEmployees += (c.employees || 0);
+    });
+
+    // Previous year data for YoY
+    var yearIdx = YEARS.indexOf(currentYear);
+    var prevYear = yearIdx > 0 ? YEARS[yearIdx - 1] : null;
+    var prevRevenue = 0, prevProfit = 0, prevEmployees = 0;
+    if (prevYear) {
+      var prevCompanies = getCompanyList(prevYear);
+      prevCompanies.forEach(function(c) {
+        if (filterIndustry !== '全部' && c.industry !== filterIndustry) return;
+        prevRevenue += (c.revenue || 0);
+        prevProfit += (c.profit || 0);
+        prevEmployees += (c.employees || 0);
+      });
+    }
+
+    function yoyStr(cur, prev) {
+      if (!prevYear || prev === 0) return '<span class="si-yoy flat">—</span>';
+      var pct = ((cur - prev) / Math.abs(prev) * 100).toFixed(1);
+      if (cur > prev) return '<span class="si-yoy up">↑ ' + pct + '%</span>';
+      if (cur < prev) return '<span class="si-yoy down">↓ ' + pct + '%</span>';
+      return '<span class="si-yoy flat">→ 0.0%</span>';
+    }
+
+    function pctStr(part, total) {
+      if (total === 0) return '0.0%';
+      return (part / total * 100).toFixed(1) + '%';
+    }
+
+    function fmtNum(n) {
+      if (n >= 10000) return (n / 10000).toFixed(2) + '万';
+      return n.toLocaleString();
+    }
+
+    function fmtEmp(n) {
+      if (n >= 10000) return (n / 10000).toFixed(1) + '万';
+      return n.toLocaleString();
+    }
+
+    var indName = filterIndustry === '全部' ? '全部行业' : filterIndustry;
+    var html =
+      '<div class="ind-summary-title">📊 <span class="sum-ind-name">' + indName + '</span> 汇总 (' + indFiltered.length + '家) — 点击查看详情</div>' +
+      '<div class="ind-summary-grid">' +
+        '<div class="ind-summary-item" data-metric="revenue">' +
+          '<div class="si-label">营收总和</div>' +
+          '<div class="si-value blue">' + fmtNum(curRevenue) + ' 亿</div>' +
+          '<div class="si-pct">占比 ' + pctStr(curRevenue, totalRevenue) + '</div>' +
+          yoyStr(curRevenue, prevRevenue) +
+        '</div>' +
+        '<div class="ind-summary-item" data-metric="profit">' +
+          '<div class="si-label">利润总和</div>' +
+          '<div class="si-value ' + (curProfit >= 0 ? 'green' : 'red') + '">' + fmtNum(curProfit) + ' 亿</div>' +
+          '<div class="si-pct">占比 ' + pctStr(curProfit, totalProfit) + '</div>' +
+          yoyStr(curProfit, prevProfit) +
+        '</div>' +
+        '<div class="ind-summary-item" data-metric="employees">' +
+          '<div class="si-label">员工总数</div>' +
+          '<div class="si-value">' + fmtEmp(curEmployees) + ' 人</div>' +
+          '<div class="si-pct">占比 ' + pctStr(curEmployees, totalEmployees) + '</div>' +
+          yoyStr(curEmployees, prevEmployees) +
+        '</div>' +
+      '</div>';
+
+    var summaryEl = document.getElementById('indSummary');
+    summaryEl.innerHTML = html;
+
+    // Bind click events on summary items
+    summaryEl.querySelectorAll('.ind-summary-item').forEach(function(item) {
+      item.addEventListener('click', function() {
+        var metric = this.dataset.metric;
+        toggleMetricPopup(metric);
+      });
+    });
+  }
+
+  // ===== Dynamic Multi-Popup System =====
+  // Each metric (revenue/profit/employees) gets its own pie + trend popup pair.
+  // Multiple pairs can coexist on screen simultaneously.
+
+  function getMetricVal(c, metric) {
+    return metric === 'revenue' ? c.revenue : metric === 'profit' ? c.profit : c.employees;
+  }
+
+  function getMetricValues(metric) {
+    var allCompanies = getCompanyList(currentYear);
+    var indFiltered = allCompanies.filter(function(c) {
+      return filterIndustry === '全部' || c.industry === filterIndustry;
+    });
+    var curVal = 0, totalVal = 0;
+    indFiltered.forEach(function(c) { curVal += (getMetricVal(c, metric) || 0); });
+    allCompanies.forEach(function(c) { totalVal += (getMetricVal(c, metric) || 0); });
+    return { curVal: curVal, totalVal: totalVal, allCompanies: allCompanies, indFiltered: indFiltered };
+  }
+
+  function toggleMetricPopup(metric) {
+    if (activePopups[metric]) {
+      closeMetricPopup(metric);
+    } else {
+      openMetricPopup(metric);
+    }
+  }
+
+  function openMetricPopup(metric) {
+    var cfg = METRIC_CONFIG[metric];
+    var off = POPUP_OFFSETS[metric];
+    var indLabel = filterIndustry === '全部' ? '全部行业' : filterIndustry;
+    var chartArea = document.querySelector('.chart-area');
+
+    // Create pie popup
+    var pieEl = createPopupEl('pie', metric, '📊 ' + indLabel + ' — ' + cfg.label + '占比', off.px, off.py, 320, 260);
+    // Create trend popup
+    var trendEl = createPopupEl('trend', metric, '📈 ' + indLabel + ' — ' + cfg.label + '五年趋势', off.tx, off.ty, 380, 260);
+
+    chartArea.appendChild(pieEl);
+    chartArea.appendChild(trendEl);
+
+    var pieChart = echarts.init(pieEl.querySelector('.cp-chart'));
+    var trendChart = echarts.init(trendEl.querySelector('.cp-chart'));
+
+    activePopups[metric] = { pie: { el: pieEl, chart: pieChart }, trend: { el: trendEl, chart: trendChart } };
+
+    bindDynamicPopupDrag(pieEl, pieChart);
+    bindDynamicPopupDrag(trendEl, trendChart);
+
+    renderMetricCharts(metric);
+    if (highlightedCompany) updateCompanyBar(metric);
+  }
+
+  function createPopupEl(type, metric, title, left, top, w, h) {
+    var popup = document.createElement('div');
+    popup.className = 'chart-popup show';
+    popup.style.left = left + 'px';
+    popup.style.top = top + 'px';
+    popup.style.width = w + 'px';
+    popup.style.height = h + 'px';
+    popup.innerHTML =
+      '<div class="chart-popup-header">' +
+        '<span class="cp-title">' + title + '</span>' +
+        '<button class="cp-close">✕</button>' +
+      '</div>' +
+      '<div class="cp-company-bar" style="display:none;padding:4px 12px;background:rgba(59,130,246,.1);border-bottom:1px solid #334155;font-size:11px;color:#10b981;line-height:1.5;"></div>' +
+      '<div class="chart-popup-body"><div class="cp-chart" style="width:100%;height:100%;"></div></div>' +
+      '<div class="cp-resize"></div>';
+    popup.querySelector('.cp-close').addEventListener('click', function() { closeMetricPopup(metric); });
+    return popup;
+  }
+
+  function closeMetricPopup(metric) {
+    var p = activePopups[metric];
+    if (!p) return;
+    p.pie.chart.dispose();
+    p.trend.chart.dispose();
+    p.pie.el.remove();
+    p.trend.el.remove();
+    delete activePopups[metric];
+  }
+
+  function renderMetricCharts(metric) {
+    var p = activePopups[metric];
+    if (!p) return;
+    var cfg = METRIC_CONFIG[metric];
+    var indLabel = filterIndustry === '全部' ? '全部行业' : filterIndustry;
+    var vals = getMetricValues(metric);
+
+    p.pie.el.querySelector('.cp-title').textContent = '📊 ' + indLabel + ' — ' + cfg.label + '占比';
+    p.trend.el.querySelector('.cp-title').textContent = '📈 ' + indLabel + ' — ' + cfg.label + '五年趋势';
+
+    renderPieChart(metric, p.pie.chart, vals, indLabel, cfg);
+    renderTrendChart(metric, p.trend.chart, indLabel, cfg);
+    updateCompanyBar(metric);
+  }
+
+  function renderPieChart(metric, chartInst, vals, indLabel, cfg) {
+    var pieData;
+    if (filterIndustry === '全部') {
+      var indSums = {};
+      ['制造业','服务业','其他行业'].forEach(function(ind) { indSums[ind] = 0; });
+      vals.allCompanies.forEach(function(c) {
+        if (indSums[c.industry] !== undefined) indSums[c.industry] += (getMetricVal(c, metric) || 0);
+      });
+      pieData = [
+        { name: '制造业', value: Math.round(indSums['制造业']*100)/100, itemStyle: { color: INDUSTRY_COLORS['制造业'] } },
+        { name: '服务业', value: Math.round(indSums['服务业']*100)/100, itemStyle: { color: INDUSTRY_COLORS['服务业'] } },
+        { name: '其他行业', value: Math.round(indSums['其他行业']*100)/100, itemStyle: { color: INDUSTRY_COLORS['其他行业'] } }
+      ];
+    } else {
+      var otherVal = vals.totalVal - vals.curVal;
+      pieData = [
+        { name: indLabel, value: Math.round(vals.curVal*100)/100, itemStyle: { color: '#3b82f6' } },
+        { name: '其余组成', value: Math.round(otherVal*100)/100, itemStyle: { color: '#334155' } }
+      ];
+    }
+    chartInst.setOption({
+      backgroundColor: 'transparent',
+      tooltip: { trigger: 'item', backgroundColor:'rgba(15,23,42,.95)', borderColor:'#3b82f6', textStyle:{color:'#f1f5f9',fontSize:12}, formatter: function(p) { return p.name + ': ' + p.value.toLocaleString() + ' ' + cfg.unit + ' (' + p.percent + '%)'; } },
+      legend: { bottom: 5, textStyle: { color: '#94a3b8', fontSize: 10 } },
+      series: [{
+        type: 'pie', radius: ['35%','65%'], center: ['50%','42%'],
+        label: { color: '#f1f5f9', fontSize: 11, formatter: '{b}\n{d}%' },
+        labelLine: { lineStyle: { color: '#475569' } },
+        data: pieData,
+        emphasis: { itemStyle: { shadowBlur: 15, shadowColor: 'rgba(59,130,246,.5)' } }
+      }]
+    }, true);
+    setTimeout(function() { chartInst.resize(); }, 50);
+  }
+
+  function renderTrendChart(metric, chartInst, indLabel, cfg) {
+    var yearLabels = [];
+    var seriesList = [];
+    if (filterIndustry === '全部') {
+      var indYearData = { '制造业':[], '服务业':[], '其他行业':[] };
+      YEARS.forEach(function(yr) {
+        var yrCompanies = getCompanyList(yr);
+        var yrSums = { '制造业':0, '服务业':0, '其他行业':0 };
+        yrCompanies.forEach(function(c) {
+          if (yrSums[c.industry] !== undefined) yrSums[c.industry] += (getMetricVal(c, metric) || 0);
+        });
+        yearLabels.push(yr);
+        ['制造业','服务业','其他行业'].forEach(function(ind) {
+          indYearData[ind].push(Math.round(yrSums[ind]*100)/100);
+        });
+      });
+      ['制造业','服务业','其他行业'].forEach(function(ind) {
+        var color = INDUSTRY_COLORS[ind];
+        seriesList.push({
+          name: ind, type: 'line', data: indYearData[ind], smooth: true,
+          symbol: 'circle', symbolSize: 7,
+          lineStyle: { color: color, width: 2.5 }, itemStyle: { color: color },
+          areaStyle: { color: { type:'linear', x:0, y:0, x2:0, y2:1, colorStops:[{offset:0,color:color+'30'},{offset:1,color:color+'00'}] } }
+        });
+      });
+    } else {
+      var indData = [];
+      var allData = [];
+      YEARS.forEach(function(yr) {
+        var yrCompanies = getCompanyList(yr);
+        var indSum = 0, allSum = 0;
+        yrCompanies.forEach(function(c) {
+          allSum += (getMetricVal(c, metric) || 0);
+          if (c.industry === filterIndustry) indSum += (getMetricVal(c, metric) || 0);
+        });
+        yearLabels.push(yr);
+        indData.push(Math.round(indSum*100)/100);
+        allData.push(Math.round(allSum*100)/100);
+      });
+      seriesList.push({
+        name: indLabel, type: 'line', data: indData, smooth: true, symbol: 'circle', symbolSize: 7,
+        lineStyle: { color: '#3b82f6', width: 2.5 }, itemStyle: { color: '#3b82f6' },
+        areaStyle: { color: { type:'linear', x:0, y:0, x2:0, y2:1, colorStops:[{offset:0,color:'rgba(59,130,246,.25)'},{offset:1,color:'rgba(59,130,246,0)'}] } }
+      });
+      seriesList.push({
+        name: '全部行业', type: 'line', data: allData, smooth: true, symbol: 'circle', symbolSize: 6,
+        lineStyle: { color: '#64748b', width: 1.5, type: 'dashed' }, itemStyle: { color: '#64748b' }
+      });
+    }
+    chartInst.setOption({
+      backgroundColor: 'transparent',
+      tooltip: { trigger: 'axis', backgroundColor:'rgba(15,23,42,.95)', borderColor:'#3b82f6', textStyle:{color:'#f1f5f9',fontSize:12} },
+      legend: { bottom: 2, textStyle: { color: '#94a3b8', fontSize: 10 } },
+      grid: { left: 55, right: 15, top: 15, bottom: 35 },
+      xAxis: { type: 'category', data: yearLabels, axisLabel: { color: '#94a3b8', fontSize: 10 }, axisLine: { lineStyle: { color: '#334155' } } },
+      yAxis: { type: 'value', axisLabel: { color: '#94a3b8', fontSize: 9, formatter: function(v) { return v >= 10000 ? (v/10000).toFixed(0)+'万' : v; } }, splitLine: { lineStyle: { color: 'rgba(51,65,85,.3)', type: 'dashed' } } },
+      series: seriesList
+    }, true);
+    setTimeout(function() { chartInst.resize(); }, 50);
+  }
+
+  // Refresh all active popups (called on year switch)
+  function refreshAllPopups() {
+    Object.keys(activePopups).forEach(function(metric) {
+      renderMetricCharts(metric);
+    });
+  }
+
+  // Update company proportion bar in all active popups
+  function updateCompanyInPopups() {
+    Object.keys(activePopups).forEach(function(metric) {
+      updateCompanyBar(metric);
+    });
+  }
+
+  function updateCompanyBar(metric) {
+    var p = activePopups[metric];
+    if (!p) return;
+    var pieBar = p.pie.el.querySelector('.cp-company-bar');
+    var trendBar = p.trend.el.querySelector('.cp-company-bar');
+    if (!highlightedCompany) {
+      if (pieBar) pieBar.style.display = 'none';
+      if (trendBar) trendBar.style.display = 'none';
+      return;
+    }
+    var cfg = METRIC_CONFIG[metric];
+    var companyVal = getMetricVal(highlightedCompany, metric);
+    if (!companyVal || companyVal <= 0) {
+      if (pieBar) pieBar.style.display = 'none';
+      if (trendBar) trendBar.style.display = 'none';
+      return;
+    }
+    var vals = getMetricValues(metric);
+    var totalPctNum = vals.totalVal > 0 ? (companyVal / vals.totalVal * 100) : 0;
+    var indPctNum = vals.curVal > 0 ? (companyVal / vals.curVal * 100) : 0;
+    var totalPct = totalPctNum.toFixed(2);
+    var indPct = indPctNum.toFixed(2);
+    var indName = filterIndustry === '全部' ? highlightedCompany.industry : filterIndustry;
+    var valStr = metric === 'employees'
+      ? (companyVal >= 10000 ? (companyVal/10000).toFixed(1)+'万' : companyVal.toLocaleString()) + ' ' + cfg.unit
+      : companyVal.toLocaleString() + ' ' + cfg.unit;
+
+    // Color logic: <3% blue, >=3% red, >=5% purple
+    function pctColor(pctNum) {
+      if (pctNum >= 5) return '#a855f7'; // purple
+      if (pctNum >= 3) return '#ef4444'; // red
+      return '#3b82f6'; // blue
+    }
+    function pctBg(pctNum) {
+      if (pctNum >= 5) return 'rgba(168,85,247,.12)';
+      if (pctNum >= 3) return 'rgba(239,68,68,.12)';
+      return 'rgba(59,130,246,.12)';
+    }
+
+    var indColor = pctColor(indPctNum);
+    var totalColor = pctColor(totalPctNum);
+    // Use the higher proportion to determine bar background
+    var maxPctNum = Math.max(indPctNum, totalPctNum);
+    var bgColor = pctBg(maxPctNum);
+
+    var barHtml = '🏢 <strong>' + highlightedCompany.name + '</strong>: ' + valStr +
+      ' · 占' + indName + ' <span style="color:' + indColor + ';font-weight:700;">' + indPct + '%</span>' +
+      ' · 占全部 <span style="color:' + totalColor + ';font-weight:700;">' + totalPct + '%</span>';
+
+    if (pieBar) {
+      pieBar.innerHTML = barHtml;
+      pieBar.style.display = 'block';
+      pieBar.style.background = bgColor;
+    }
+    if (trendBar) {
+      trendBar.innerHTML = barHtml;
+      trendBar.style.display = 'block';
+      trendBar.style.background = bgColor;
+    }
+  }
+
+  function bindDynamicPopupDrag(popup, chartInst) {
+    var header = popup.querySelector('.chart-popup-header');
+    var pDragging = false, pStartX = 0, pStartY = 0, pLeft = 0, pTop = 0;
+    header.addEventListener('mousedown', function(e) {
+      if (e.target.classList.contains('cp-close')) return;
+      pDragging = true;
+      var rect = popup.getBoundingClientRect();
+      var parentRect = document.querySelector('.chart-area').getBoundingClientRect();
+      pStartX = e.clientX; pStartY = e.clientY;
+      pLeft = rect.left - parentRect.left;
+      pTop = rect.top - parentRect.top;
+      popup.classList.add('dragging');
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove', function(e) {
+      if (!pDragging) return;
+      var parentRect = document.querySelector('.chart-area').getBoundingClientRect();
+      var newLeft = pLeft + (e.clientX - pStartX);
+      var newTop = pTop + (e.clientY - pStartY);
+      newLeft = Math.max(0, Math.min(newLeft, parentRect.width - popup.offsetWidth));
+      newTop = Math.max(0, Math.min(newTop, parentRect.height - popup.offsetHeight));
+      popup.style.left = newLeft + 'px';
+      popup.style.top = newTop + 'px';
+    });
+    document.addEventListener('mouseup', function() {
+      if (pDragging) { pDragging = false; popup.classList.remove('dragging'); }
+    });
+    var resizeHandle = popup.querySelector('.cp-resize');
+    var rDragging = false, rStartX = 0, rStartY = 0, rStartW = 0, rStartH = 0;
+    resizeHandle.addEventListener('mousedown', function(e) {
+      rDragging = true;
+      rStartX = e.clientX; rStartY = e.clientY;
+      rStartW = popup.offsetWidth; rStartH = popup.offsetHeight;
+      e.preventDefault(); e.stopPropagation();
+    });
+    document.addEventListener('mousemove', function(e) {
+      if (!rDragging) return;
+      var newW = Math.max(250, rStartW + (e.clientX - rStartX));
+      var newH = Math.max(180, rStartH + (e.clientY - rStartY));
+      popup.style.width = newW + 'px';
+      popup.style.height = newH + 'px';
+      if (chartInst) chartInst.resize();
+    });
+    document.addEventListener('mouseup', function() {
+      if (rDragging) { rDragging = false; }
+    });
+  }
+
+  function resizeAllPopups() {
+    Object.keys(activePopups).forEach(function(metric) {
+      var p = activePopups[metric];
+      if (p.pie.chart) p.pie.chart.resize();
+      if (p.trend.chart) p.trend.chart.resize();
+    });
+  }
+
+  // ===== Locate company in scatter plot =====
+  function locateCompany(name) {
+    var allCompanies = getCompanyList(currentYear);
+    var company = null;
+    for (var i = 0; i < allCompanies.length; i++) {
+      if (allCompanies[i].name === name) { company = allCompanies[i]; break; }
+    }
+    if (!company) return;
+
+    highlightedCompany = company;
+    selectedSubIndustry = company.subIndustry;
+
+    // Highlight the sub-industry point in the chart
+    highlightPoint(company.subIndustry);
+
+    // Show detail card
+    showDetailCard(company);
+
+    // Update left panel highlight
+    renderCompanyList();
+
+    // Scroll to the company in the list
+    setTimeout(function() {
+      var row = document.querySelector('.company-row.highlighted');
+      if (row) row.scrollIntoView({ behavior:'smooth', block:'center' });
+    }, 50);
+  }
+
+  // ===== Highlight a point in the scatter chart =====
+  function highlightPoint(subIndustry) {
+    if (!chart) return;
+    var yearData = SCATTER_DATA[currentYear] || [];
+    var item = null;
+    for (var i = 0; i < yearData.length; i++) {
+      if (yearData[i].sub_industry === subIndustry) { item = yearData[i]; break; }
+    }
+    if (!item) return;
+
+    // Dispatch highlight action
+    chart.dispatchAction({ type:'highlight', seriesIndex: getSeriesIndex(item.industry), dataIndex: getDataIndex(item.industry, subIndustry) });
+    // Also show tooltip
+    chart.dispatchAction({ type:'showTip', seriesIndex: getSeriesIndex(item.industry), dataIndex: getDataIndex(item.industry, subIndustry) });
+  }
+
+  function getSeriesIndex(industry) {
+    return ['制造业','服务业','其他行业'].indexOf(industry);
+  }
+
+  function getDataIndex(industry, subIndustry) {
+    var yearData = SCATTER_DATA[currentYear] || [];
+    var idx = 0;
+    for (var i = 0; i < yearData.length; i++) {
+      if (yearData[i].industry === industry) {
+        if (yearData[i].sub_industry === subIndustry) return idx;
+        idx++;
+      }
+    }
+    return 0;
+  }
+
+  // ===== Detail Card =====
+  function showDetailCard(company) {
+    var card = document.getElementById('detailCard');
+    document.getElementById('dcTitle').textContent = company.name;
+    document.getElementById('dcSub').innerHTML =
+      '<span class="tag" style="background:' + INDUSTRY_BG[company.industry] + ';color:' + INDUSTRY_COLORS[company.industry] + '">' + company.industry + '</span>' +
+      '<span class="tag" style="background:rgba(59,130,246,.15);color:var(--accent)">' + company.subIndustry + '</span>' +
+      '<span class="tag" style="background:rgba(100,116,139,.15);color:var(--muted)">' + (company.country||'-') + '</span>' +
+      '<span class="tag" style="background:rgba(245,158,11,.15);color:var(--warning)">第' + company.rank + '名</span>';
+
+    var empStr = company.employees > 0 ? (company.employees > 10000 ? (company.employees/10000).toFixed(1)+'万人' : company.employees+'人') : '-';
+
+    // Get assets from COMPANY_HISTORY
+    var assetsStr = '-';
+    var histData = (typeof COMPANY_HISTORY !== 'undefined' && COMPANY_HISTORY[company.name]) ? COMPANY_HISTORY[company.name] : null;
+    if (histData && histData[currentYear] && histData[currentYear].assets != null) {
+      assetsStr = histData[currentYear].assets.toLocaleString() + ' 亿';
+    }
+
+    document.getElementById('dcGrid').innerHTML =
+      '<div class="dc-item"><div class="dc-label">营业收入</div><div class="dc-value blue">' + company.revenue.toLocaleString() + ' 亿</div></div>' +
+      '<div class="dc-item"><div class="dc-label">利润</div><div class="dc-value ' + (company.profit>=0?'green':'red') + '">' + company.profit.toLocaleString() + ' 亿</div></div>' +
+      '<div class="dc-item"><div class="dc-label">总资产</div><div class="dc-value" style="color:var(--accent3)">' + assetsStr + '</div></div>' +
+      '<div class="dc-item"><div class="dc-label">净利率</div><div class="dc-value">' + (company.margin||'-') + '%</div></div>' +
+      '<div class="dc-item"><div class="dc-label">员工数</div><div class="dc-value">' + empStr + '</div></div>';
+    document.getElementById('dcHint').textContent = '📍 已在散点图中定位到「' + company.subIndustry + '」';
+    card.classList.add('show');
+
+    // Show history card
+    showHistoryCard(company);
+
+    // Update company proportion in all active chart popups
+    updateCompanyInPopups();
+  }
+
+  // ===== History Card (ranking + YoY chart) =====
+  function showHistoryCard(company) {
+    var histCard = document.getElementById('historyCard');
+    document.getElementById('hcTitle').textContent = company.name + ' — 历年详情';
+    document.getElementById('hcSub').innerHTML =
+      '<span class="tag" style="background:' + INDUSTRY_BG[company.industry] + ';color:' + INDUSTRY_COLORS[company.industry] + '">' + company.industry + '</span>' +
+      '<span class="tag" style="background:rgba(245,158,11,.15);color:var(--warning)">排名变化</span>';
+
+    // Build ranking history row
+    var histData = (typeof COMPANY_HISTORY !== 'undefined' && COMPANY_HISTORY[company.name]) ? COMPANY_HISTORY[company.name] : null;
+    var rankHtml = '';
+    var prevRank = null;
+    YEARS.forEach(function(yr) {
+      var yrData = histData && histData[yr] ? histData[yr] : null;
+      var rank = yrData ? yrData.rank : null;
+      var chgStr = '';
+      var chgClass = '';
+      if (rank != null && prevRank != null) {
+        var diff = prevRank - rank; // positive = improved (rank number decreased)
+        if (diff > 0) { chgStr = '↑' + diff; chgClass = 'up'; }
+        else if (diff < 0) { chgStr = '↓' + Math.abs(diff); chgClass = 'down'; }
+        else { chgStr = '—'; chgClass = ''; }
+      }
+      var rankCls = chgClass;
+      rankHtml +=
+        '<div class="hc-rank-item">' +
+          '<div class="hc-rank-yr">' + yr + '</div>' +
+          '<div class="hc-rank-val ' + rankCls + '">' + (rank != null ? '#' + rank : '—') + '</div>' +
+          '<div class="hc-rank-chg ' + chgClass + '">' + chgStr + '</div>' +
+        '</div>';
+      prevRank = rank;
+    });
+    document.getElementById('hcRankRow').innerHTML = rankHtml;
+
+    // Render YoY line chart
+    renderHistoryChart(company, histData);
+    histCard.classList.add('show');
+  }
+
+  function renderHistoryChart(company, histData) {
+    var chartEl = document.getElementById('hcChart');
+    if (historyChart) historyChart.dispose();
+    historyChart = echarts.init(chartEl);
+
+    var metrics = [
+      { key: 'assets',   label: '总资产',  color: '#a855f7' },
+      { key: 'revenue',  label: '营收',    color: '#3b82f6' },
+      { key: 'profit',   label: '利润',    color: '#10b981' },
+      { key: 'employees',label: '员工数',  color: '#f59e0b' }
+    ];
+
+    // Build YoY change rate series for each metric
+    var seriesList = [];
+    metrics.forEach(function(m) {
+      var vals = [];
+      var rates = [];
+      YEARS.forEach(function(yr, idx) {
+        var yrData = histData && histData[yr] ? histData[yr] : null;
+        var val = yrData ? yrData[m.key] : null;
+        vals.push(val);
+        if (idx === 0 || val == null) {
+          rates.push(null);
+        } else {
+          var prevVal = vals[idx - 1];
+          if (prevVal == null || prevVal === 0) {
+            rates.push(null);
+          } else {
+            rates.push(Math.round(((val - prevVal) / Math.abs(prevVal) * 100) * 100) / 100);
+          }
+        }
+      });
+      seriesList.push({
+        name: m.label, type: 'line', data: rates, smooth: true,
+        symbol: 'circle', symbolSize: 6,
+        lineStyle: { color: m.color, width: 2 }, itemStyle: { color: m.color },
+        connectNulls: true
+      });
+    });
+
+    historyChart.setOption({
+      backgroundColor: 'transparent',
+      title: { text: '同比变化率 (%)', left: 'center', top: 2, textStyle: { color: '#94a3b8', fontSize: 11 } },
+      tooltip: {
+        trigger: 'axis',
+        backgroundColor: 'rgba(15,23,42,.95)', borderColor: '#3b82f6',
+        textStyle: { color: '#f1f5f9', fontSize: 11 },
+        formatter: function(params) {
+          var html = params[0].axisValue + '年<br/>';
+          params.forEach(function(p) {
+            var v = p.value;
+            var vStr = v == null ? '—' : (v > 0 ? '+' + v.toFixed(2) + '%' : v.toFixed(2) + '%');
+            var vColor = v == null ? '#94a3b8' : (v >= 0 ? '#10b981' : '#ef4444');
+            html += p.marker + p.seriesName + ': <span style="color:' + vColor + ';font-weight:700;">' + vStr + '</span><br/>';
+          });
+          return html;
+        }
+      },
+      legend: { bottom: 2, textStyle: { color: '#94a3b8', fontSize: 9 }, itemWidth: 12, itemHeight: 8 },
+      grid: { left: 50, right: 15, top: 28, bottom: 35 },
+      xAxis: { type: 'category', data: YEARS, axisLabel: { color: '#94a3b8', fontSize: 10 }, axisLine: { lineStyle: { color: '#334155' } } },
+      yAxis: {
+        type: 'value', axisLabel: { color: '#94a3b8', fontSize: 9, formatter: '{value}%' },
+        splitLine: { lineStyle: { color: 'rgba(51,65,85,.3)', type: 'dashed' } },
+        axisLine: { lineStyle: { color: '#334155' } }
+      },
+      series: seriesList
+    });
+    setTimeout(function() { historyChart.resize(); }, 50);
+  }
+
+  // ===== Chart =====
+  function initChart() {
+    chart = echarts.init(document.getElementById('chart'), null, { renderer:'canvas' });
+    updateChart();
+    chart.on('click', function(params) {
+      if (params.componentType === 'series' && params.data && params.data.subIndustry) {
+        highlightPoint(params.data.subIndustry);
+        selectedSubIndustry = params.data.subIndustry;
+        // Filter left panel to show companies from this sub-industry
+        subIndustryFilter = params.data.subIndustry;
+        renderCompanyList();
+        // Scroll to top of list
+        document.getElementById('companyList').scrollTop = 0;
+      }
+    });
+    window.addEventListener('resize', function() { if (chart) chart.resize(); resizeAllPopups(); if (historyChart) historyChart.resize(); });
+    // Expose chart for parent portal
+    window.chart = chart;
+  }
+
+  function getScatterData(year) {
+    var yearData = SCATTER_DATA[year];
+    var series = {};
+    ['制造业','服务业','其他行业'].forEach(function(ind) { series[ind] = []; });
+    yearData.forEach(function(item) {
+      var ind = item.industry;
+      if (!series[ind]) series[ind] = [];
+      series[ind].push({
+        name: item.sub_industry,
+        value: [item.revenue, item.profit, item.count],
+        subIndustry: item.sub_industry,
+        industry: ind,
+        revenue: item.revenue,
+        profit: item.profit,
+        count: item.count,
+        companies: item.companies,
+        symbolSize: Math.sqrt(item.count) * 8 + 12
+      });
+    });
+    return series;
+  }
+
+  function getTrajectoryCustomSeries() {
+    var allSubInds = {};
+    YEARS.forEach(function(yr) {
+      SCATTER_DATA[yr].forEach(function(item) {
+        if (!allSubInds[item.sub_industry]) {
+          allSubInds[item.sub_industry] = { industry:item.industry, points:[] };
+        }
+        allSubInds[item.sub_industry].points.push([item.revenue, item.profit]);
+      });
+    });
+    var trajData = [];
+    Object.keys(allSubInds).forEach(function(si) {
+      var info = allSubInds[si];
+      if (info.points.length >= 2) {
+        trajData.push({ coords:info.points, industry:info.industry, subIndustry:si });
+      }
+    });
+    return {
+      name:'5年轨迹', type:'custom', data:trajData, coordinateSystem:'cartesian2d',
+      renderItem: function(params, api) {
+        var item = trajData[params.dataIndex];
+        if (!item || !item.coords || item.coords.length < 2) return;
+        var points = item.coords.map(function(coord) { var p = api.coord([coord[0],coord[1]]); return [p[0],p[1]]; });
+        return { type:'line', shape:{ points:points }, style:{ stroke:INDUSTRY_COLORS[item.industry]||'#64748b', lineWidth:1.5, opacity:0.4, lineDash:[5,4] }, silent:true };
+      },
+      silent:true, z:1, animation:false
+    };
+  }
+
+  function updateChart() {
+    var seriesData = getScatterData(currentYear);
+    var seriesList = [];
+    if (showTrajectory) seriesList.push(getTrajectoryCustomSeries());
+    ['制造业','服务业','其他行业'].forEach(function(ind) {
+      seriesList.push({
+        name:ind, type:'scatter', data:seriesData[ind]||[],
+        symbolSize: function(data) { return Math.sqrt(data[2])*8+12; },
+        itemStyle: { color:INDUSTRY_COLORS[ind], opacity:0.75, borderColor:'#fff', borderWidth:1.5, shadowBlur:8, shadowColor:INDUSTRY_COLORS[ind]+'40' },
+        emphasis: {
+          itemStyle: { opacity:1, borderWidth:3, shadowBlur:20, shadowColor:INDUSTRY_COLORS[ind]+'80', borderColor:'#fbbf24' },
+          label: { show:true, position:'top', formatter:function(p){return p.data.subIndustry;}, color:'#f1f5f9', fontSize:12, fontWeight:700, backgroundColor:'rgba(15,23,42,.85)', borderRadius:4, padding:[4,8] }
+        },
+        z:10
+      });
+    });
+    chart.setOption({
+      backgroundColor:'transparent',
+      title: { text:'细分行业营收与利润散点对比 ('+currentYear+'年)', subtext:'X轴:营业收入(亿美元) | Y轴:利润(亿美元) | 气泡大小:企业数量', left:'center', top:10, textStyle:{color:'#f1f5f9',fontSize:15,fontWeight:700}, subtextStyle:{color:'#94a3b8',fontSize:11} },
+      grid: { left:70, right:30, top:70, bottom:70 },
+      xAxis: { type:'value', name:'营业收入 (亿美元)', nameLocation:'middle', nameGap:30, nameTextStyle:{color:'#94a3b8',fontSize:12}, axisLine:{lineStyle:{color:'#334155'}}, axisLabel:{color:'#94a3b8',formatter:function(v){return v.toLocaleString();}}, splitLine:{lineStyle:{color:'rgba(51,65,85,.3)',type:'dashed'}} },
+      yAxis: { type:'value', name:'利润 (亿美元)', nameLocation:'middle', nameGap:45, nameTextStyle:{color:'#94a3b8',fontSize:12}, axisLine:{lineStyle:{color:'#334155'}}, axisLabel:{color:'#94a3b8',formatter:function(v){return v.toLocaleString();}}, splitLine:{lineStyle:{color:'rgba(51,65,85,.3)',type:'dashed'}} },
+      legend: { data:['制造业','服务业','其他行业'], top:48, right:16, textStyle:{color:'#94a3b8'}, itemWidth:12, itemHeight:12 },
+      dataZoom: [
+        { type:'inside', xAxisIndex:0, filterMode:'none' },
+        { type:'inside', yAxisIndex:0, filterMode:'none' },
+        { type:'slider', xAxisIndex:0, filterMode:'none', bottom:12, height:18, borderColor:'#334155', backgroundColor:'#1e293b', fillerColor:'rgba(59,130,246,.15)', handleStyle:{color:'#3b82f6'}, textStyle:{color:'#94a3b8'} },
+        { type:'slider', yAxisIndex:0, filterMode:'none', right:12, width:18, borderColor:'#334155', backgroundColor:'#1e293b', fillerColor:'rgba(59,130,246,.15)', handleStyle:{color:'#3b82f6'}, textStyle:{color:'#94a3b8'} }
+      ],
+      tooltip: {
+        trigger:'item', backgroundColor:'rgba(15,23,42,.95)', borderColor:'#3b82f6', borderWidth:1, textStyle:{color:'#f1f5f9',fontSize:12},
+        formatter: function(params) {
+          if (!params.data || !params.data.subIndustry) return '';
+          var d = params.data;
+          var margin = d.revenue > 0 ? (d.profit/d.revenue*100).toFixed(1) : '0';
+          return '<div style="font-weight:700;font-size:13px;margin-bottom:4px;">'+d.subIndustry+'</div>'+
+            '<div style="display:flex;justify-content:space-between;gap:16px;margin:2px 0;"><span style="color:#94a3b8;">营收</span><span style="font-weight:600;">'+d.revenue.toLocaleString()+' 亿美元</span></div>'+
+            '<div style="display:flex;justify-content:space-between;gap:16px;margin:2px 0;"><span style="color:#94a3b8;">利润</span><span style="font-weight:600;">'+d.profit.toLocaleString()+' 亿美元</span></div>'+
+            '<div style="display:flex;justify-content:space-between;gap:16px;margin:2px 0;"><span style="color:#94a3b8;">净利率</span><span style="font-weight:600;">'+margin+'%</span></div>'+
+            '<div style="display:flex;justify-content:space-between;gap:16px;margin:2px 0;"><span style="color:#94a3b8;">企业数</span><span style="font-weight:600;">'+d.count+' 家</span></div>'+
+            '<div style="margin-top:6px;color:#3b82f6;font-size:11px;">点击查看该行业企业列表 →</div>';
+        }
+      },
+      series: seriesList,
+      animation:true, animationDuration:600, animationDurationUpdate:600, animationEasingUpdate:'cubicOut'
+    }, { notMerge:true });
+
+    // Re-highlight if there's a selected company
+    if (highlightedCompany) {
+      setTimeout(function() { highlightPoint(highlightedCompany.subIndustry); }, 100);
+    }
+  }
+
+  // ===== Year controls =====
+  function updateYearUI() {
+    document.getElementById('yearDisplay').textContent = currentYear;
+    var idx = YEARS.indexOf(currentYear);
+    var pct = (idx/(YEARS.length-1))*100;
+    document.getElementById('sliderTrack').style.width = pct+'%';
+    document.getElementById('sliderThumb').style.left = pct+'%';
+    document.getElementById('yearMarkers').querySelectorAll('span').forEach(function(s) {
+      s.classList.toggle('active', s.dataset.year === currentYear);
+    });
+  }
+
+  function setYear(year) {
+    if (year === currentYear) return;
+    currentYear = year;
+    updateYearUI();
+    updateChart();
+    // Check if subIndustryFilter still exists in new year
+    if (subIndustryFilter) {
+      var yearData = SCATTER_DATA[currentYear] || [];
+      var found = yearData.some(function(d) { return d.sub_industry === subIndustryFilter; });
+      if (!found) subIndustryFilter = null;
+    }
+    renderCompanyList();
+    // If highlighted company exists in new year, re-locate and update detail card
+    if (highlightedCompany) {
+      var all = getCompanyList(currentYear);
+      var found = all.find(function(c) { return c.name === highlightedCompany.name; });
+      if (found) {
+        highlightedCompany = found;
+        showDetailCard(found);
+        // Re-highlight the point in the updated chart
+        setTimeout(function() { highlightPoint(found.subIndustry); }, 200);
+      } else {
+        highlightedCompany = null;
+        document.getElementById('detailCard').classList.remove('show');
+        document.getElementById('historyCard').classList.remove('show');
+        if (historyChart) { historyChart.dispose(); historyChart = null; }
+      }
+    }
+    // Refresh all active chart popups with new year data
+    refreshAllPopups();
+  }
+
+  function togglePlay() {
+    if (isPlaying) {
+      isPlaying = false;
+      document.getElementById('playBtn').textContent = '▶';
+      clearInterval(playTimer);
+    } else {
+      isPlaying = true;
+      document.getElementById('playBtn').textContent = '⏸';
+      var startIdx = YEARS.indexOf(currentYear);
+      if (startIdx === YEARS.length-1) { setYear(YEARS[0]); }
+      playTimer = setInterval(function() {
+        var idx = YEARS.indexOf(currentYear);
+        if (idx >= YEARS.length-1) { togglePlay(); return; }
+        setYear(YEARS[idx+1]);
+      }, 1500);
+    }
+  }
+
+  // ===== Event bindings =====
+  function bindEvents() {
+    // Year selector
+    document.getElementById('yearSelector').addEventListener('click', function(e) {
+      var btn = e.target.closest('.year-btn');
+      if (!btn) return;
+      document.querySelectorAll('.year-btn').forEach(function(b){b.classList.remove('active');});
+      btn.classList.add('active');
+      setYear(btn.dataset.year);
+    });
+
+    // Search
+    document.getElementById('searchInput').addEventListener('input', function(e) {
+      searchTerm = e.target.value.trim();
+      renderCompanyList();
+    });
+
+    // Industry filter
+    document.getElementById('indFilter').addEventListener('click', function(e) {
+      var btn = e.target.closest('.ind-btn');
+      if (!btn) return;
+      filterIndustry = btn.dataset.ind;
+      document.querySelectorAll('.ind-btn').forEach(function(b){b.classList.remove('active');});
+      btn.classList.add('active');
+      renderCompanyList();
+      // Refresh all active popups for new industry context
+      refreshAllPopups();
+    });
+
+    // Detail card close
+    document.getElementById('dcClose').addEventListener('click', function() {
+      document.getElementById('detailCard').classList.remove('show');
+      document.getElementById('historyCard').classList.remove('show');
+      if (historyChart) { historyChart.dispose(); historyChart = null; }
+      if (highlightedCompany && chart) {
+        // Remove highlight
+        var ind = highlightedCompany.industry;
+        chart.dispatchAction({ type:'downplay', seriesIndex:getSeriesIndex(ind), dataIndex:getDataIndex(ind, highlightedCompany.subIndustry) });
+      }
+      highlightedCompany = null;
+      renderCompanyList();
+      // Remove company proportion bars from all active popups
+      updateCompanyInPopups();
+    });
+
+    // History card close
+    document.getElementById('hcClose').addEventListener('click', function() {
+      document.getElementById('historyCard').classList.remove('show');
+      if (historyChart) { historyChart.dispose(); historyChart = null; }
+    });
+
+    // Portal deep-dive button — notify parent iframe
+    document.getElementById('portalDeepDiveBtn').addEventListener('click', function() {
+      var title = document.getElementById('dcTitle');
+      if (title && title.textContent && window.parent !== window) {
+        window.parent.postMessage({
+          type: 'companySelected',
+          company: title.textContent,
+          source: 'scatter'
+        }, '*');
+      }
+    });
+
+    // Detail card drag — move anywhere within chart-area
+    var detailCard = document.getElementById('detailCard');
+    var chartArea = document.querySelector('.chart-area');
+    var dcDragging = false;
+    var dcStartX = 0, dcStartY = 0, dcCardX = 0, dcCardY = 0;
+
+    detailCard.addEventListener('mousedown', function(e) {
+      // Don't drag when clicking close button or deep-dive button
+      if (e.target.id === 'dcClose' || e.target.id === 'portalDeepDiveBtn') return;
+      dcDragging = true;
+      var rect = detailCard.getBoundingClientRect();
+      var parentRect = chartArea.getBoundingClientRect();
+      dcStartX = e.clientX;
+      dcStartY = e.clientY;
+      dcCardX = rect.left - parentRect.left;
+      dcCardY = rect.top - parentRect.top;
+      detailCard.classList.add('dragging');
+      // Clear right/top defaults so left/top take effect
+      detailCard.style.right = 'auto';
+      detailCard.style.top = dcCardY + 'px';
+      detailCard.style.left = dcCardX + 'px';
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove', function(e) {
+      if (!dcDragging) return;
+      var parentRect = chartArea.getBoundingClientRect();
+      var newLeft = dcCardX + (e.clientX - dcStartX);
+      var newTop = dcCardY + (e.clientY - dcStartY);
+      // Clamp within chart-area bounds
+      newLeft = Math.max(0, Math.min(newLeft, parentRect.width - detailCard.offsetWidth));
+      newTop = Math.max(0, Math.min(newTop, parentRect.height - detailCard.offsetHeight));
+      detailCard.style.left = newLeft + 'px';
+      detailCard.style.top = newTop + 'px';
+    });
+    document.addEventListener('mouseup', function() {
+      if (dcDragging) {
+        dcDragging = false;
+        detailCard.classList.remove('dragging');
+      }
+    });
+    // Touch support for dragging
+    detailCard.addEventListener('touchstart', function(e) {
+      if (e.target.id === 'dcClose' || e.target.id === 'portalDeepDiveBtn') return;
+      dcDragging = true;
+      var rect = detailCard.getBoundingClientRect();
+      var parentRect = chartArea.getBoundingClientRect();
+      dcStartX = e.touches[0].clientX;
+      dcStartY = e.touches[0].clientY;
+      dcCardX = rect.left - parentRect.left;
+      dcCardY = rect.top - parentRect.top;
+      detailCard.classList.add('dragging');
+      detailCard.style.right = 'auto';
+      detailCard.style.top = dcCardY + 'px';
+      detailCard.style.left = dcCardX + 'px';
+      e.preventDefault();
+    }, { passive: false });
+    document.addEventListener('touchmove', function(e) {
+      if (!dcDragging) return;
+      var parentRect = chartArea.getBoundingClientRect();
+      var newLeft = dcCardX + (e.touches[0].clientX - dcStartX);
+      var newTop = dcCardY + (e.touches[0].clientY - dcStartY);
+      newLeft = Math.max(0, Math.min(newLeft, parentRect.width - detailCard.offsetWidth));
+      newTop = Math.max(0, Math.min(newTop, parentRect.height - detailCard.offsetHeight));
+      detailCard.style.left = newLeft + 'px';
+      detailCard.style.top = newTop + 'px';
+    });
+    document.addEventListener('touchend', function() {
+      if (dcDragging) {
+        dcDragging = false;
+        detailCard.classList.remove('dragging');
+      }
+    });
+
+    // History card drag — same pattern as detail card
+    var historyCard = document.getElementById('historyCard');
+    var hcDragging = false;
+    var hcStartX = 0, hcStartY = 0, hcCardX = 0, hcCardY = 0;
+    historyCard.addEventListener('mousedown', function(e) {
+      if (e.target.id === 'hcClose' || e.target.closest('.hc-chart-wrap') || e.target.closest('.hc-rank-row')) return;
+      hcDragging = true;
+      var rect = historyCard.getBoundingClientRect();
+      var parentRect = chartArea.getBoundingClientRect();
+      hcStartX = e.clientX; hcStartY = e.clientY;
+      hcCardX = rect.left - parentRect.left;
+      hcCardY = rect.top - parentRect.top;
+      historyCard.classList.add('dragging');
+      historyCard.style.right = 'auto';
+      historyCard.style.top = hcCardY + 'px';
+      historyCard.style.left = hcCardX + 'px';
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove', function(e) {
+      if (!hcDragging) return;
+      var parentRect = chartArea.getBoundingClientRect();
+      var newLeft = hcCardX + (e.clientX - hcStartX);
+      var newTop = hcCardY + (e.clientY - hcStartY);
+      newLeft = Math.max(0, Math.min(newLeft, parentRect.width - historyCard.offsetWidth));
+      newTop = Math.max(0, Math.min(newTop, parentRect.height - historyCard.offsetHeight));
+      historyCard.style.left = newLeft + 'px';
+      historyCard.style.top = newTop + 'px';
+    });
+    document.addEventListener('mouseup', function() {
+      if (hcDragging) { hcDragging = false; historyCard.classList.remove('dragging'); }
+    });
+
+    // ===== Summary bar vertical resize =====
+    var summaryResizer = document.getElementById('summaryResizer');
+    var indSummaryEl = document.getElementById('indSummary');
+    var smResizing = false, smStartY = 0, smStartH = 0;
+    summaryResizer.addEventListener('mousedown', function(e) {
+      smResizing = true;
+      smStartY = e.clientY;
+      smStartH = indSummaryEl.offsetHeight;
+      document.body.style.cursor = 'ns-resize';
+      document.body.style.userSelect = 'none';
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove', function(e) {
+      if (!smResizing) return;
+      var newH = smStartH + (e.clientY - smStartY);
+      newH = Math.max(60, Math.min(newH, 400));
+      indSummaryEl.style.height = newH + 'px';
+    });
+    document.addEventListener('mouseup', function() {
+      if (smResizing) { smResizing = false; document.body.style.cursor=''; document.body.style.userSelect=''; }
+    });
+
+    // Dynamic popups handle their own drag/resize via bindDynamicPopupDrag()
+
+    // Play button
+    document.getElementById('playBtn').addEventListener('click', togglePlay);
+
+    // Year slider
+    var slider = document.getElementById('yearSlider');
+    var isDragging = false;
+    function updateFromX(clientX) {
+      var rect = slider.getBoundingClientRect();
+      var pct = (clientX - rect.left) / rect.width;
+      pct = Math.max(0, Math.min(1, pct));
+      var idx = Math.round(pct * (YEARS.length-1));
+      setYear(YEARS[idx]);
+    }
+    slider.addEventListener('mousedown', function(e) { isDragging=true; updateFromX(e.clientX); });
+    document.addEventListener('mousemove', function(e) { if(isDragging) updateFromX(e.clientX); });
+    document.addEventListener('mouseup', function() { isDragging=false; });
+    slider.addEventListener('touchstart', function(e) { isDragging=true; updateFromX(e.touches[0].clientX); });
+    document.addEventListener('touchmove', function(e) { if(isDragging) updateFromX(e.touches[0].clientX); });
+    document.addEventListener('touchend', function() { isDragging=false; });
+
+    // Year markers
+    document.getElementById('yearMarkers').querySelectorAll('span').forEach(function(span) {
+      span.addEventListener('click', function() { setYear(this.dataset.year); });
+    });
+
+    // Keyboard: Enter to search first result
+    document.getElementById('searchInput').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        var firstRow = document.querySelector('.company-row');
+        if (firstRow && firstRow.dataset.name) {
+          locateCompany(firstRow.dataset.name);
+        }
+      }
+    });
+
+    // Sub-industry filter clear
+    document.getElementById('subIndFilterClose').addEventListener('click', function() {
+      subIndustryFilter = null;
+      renderCompanyList();
+    });
+
+    // Panel resizer — drag to resize left panel width
+    var resizer = document.getElementById('resizer');
+    var leftPanel = document.getElementById('leftPanel');
+    var isResizing = false;
+    var resizeStartX = 0;
+    var resizeStartWidth = 0;
+    var MIN_W = 250, MAX_W = 700;
+
+    resizer.addEventListener('mousedown', function(e) {
+      isResizing = true;
+      resizeStartX = e.clientX;
+      resizeStartWidth = leftPanel.offsetWidth;
+      resizer.classList.add('dragging');
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove', function(e) {
+      if (!isResizing) return;
+      var newW = resizeStartWidth + (e.clientX - resizeStartX);
+      newW = Math.max(MIN_W, Math.min(MAX_W, newW));
+      leftPanel.style.width = newW + 'px';
+      if (chart) chart.resize();
+    });
+    document.addEventListener('mouseup', function() {
+      if (isResizing) {
+        isResizing = false;
+        resizer.classList.remove('dragging');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      }
+    });
+    // Touch support for resizer
+    resizer.addEventListener('touchstart', function(e) {
+      isResizing = true;
+      resizeStartX = e.touches[0].clientX;
+      resizeStartWidth = leftPanel.offsetWidth;
+      resizer.classList.add('dragging');
+      e.preventDefault();
+    }, { passive:false });
+    document.addEventListener('touchmove', function(e) {
+      if (!isResizing) return;
+      var newW = resizeStartWidth + (e.touches[0].clientX - resizeStartX);
+      newW = Math.max(MIN_W, Math.min(MAX_W, newW));
+      leftPanel.style.width = newW + 'px';
+      if (chart) chart.resize();
+    });
+    document.addEventListener('touchend', function() {
+      if (isResizing) {
+        isResizing = false;
+        resizer.classList.remove('dragging');
+      }
+    });
+  }
+
+  // ===== Init with retry for iframe embedding =====
+  function init() {
+    var chartDiv = document.getElementById('chart');
+    if (chartDiv && chartDiv.offsetWidth > 0 && chartDiv.offsetHeight > 0) {
+      bindEvents();
+      initChart();
+      updateYearUI();
+      renderCompanyList();
+
+      // Detect if embedded in portal iframe
+      if (window.parent !== window) {
+        document.body.classList.add('in-portal');
+        // Listen for year sync messages from portal
+        window.addEventListener('message', function(e) {
+          if (e.data && e.data.type === 'setYear') {
+            var yb = document.querySelector('.year-btn[data-year="' + e.data.year + '"]');
+            if (yb) yb.click();
+          }
+        });
+        // Notify parent when year changes
+        var ys = document.getElementById('yearSelector');
+        if (ys) ys.addEventListener('click', function(e) {
+          var yb = e.target.closest('.year-btn');
+          if (yb) setTimeout(function() {
+            window.parent.postMessage({ type: 'yearChanged', year: yb.dataset.year, source: 'scatter' }, '*');
+          }, 50);
+        }, true);
+      }
+    } else {
+      setTimeout(init, 100);
+    }
+  }
+  if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    init();
+  } else {
+    document.addEventListener('DOMContentLoaded', init);
+  }
+})();
+</script>
+</body>
+</html>
