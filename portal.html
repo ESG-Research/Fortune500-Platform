@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>财富世界500强 — 综合分析平台</title>
+<style>
+:root {
+  --bg: #0f172a; --bg2: #1e293b; --bg3: #334155;
+  --ink: #f1f5f9; --muted: #94a3b8; --rule: #334155;
+  --accent: #3b82f6; --accent2: #10b981; --accent3: #a855f7;
+  --warning: #f59e0b; --danger: #ef4444;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { height:100%; }
+body {
+  font-family:'Segoe UI','Microsoft YaHei',sans-serif;
+  overflow:hidden; display:flex; flex-direction:column;
+  background:var(--bg); color:var(--ink);
+}
+
+/* ===== Portal Header ===== */
+.portal-header {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  border-bottom: 1px solid var(--rule);
+  padding: 0 16px;
+  display: flex; align-items: center; gap: 16px;
+  flex-shrink: 0; height: 48px;
+  z-index: 100;
+  box-shadow: 0 2px 12px rgba(0,0,0,.3);
+}
+.portal-brand {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 15px; font-weight: 800; white-space: nowrap;
+}
+.portal-brand .brand-icon { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+.portal-brand .brand-text {
+  background: linear-gradient(135deg, #60a5fa, #34d399);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Tabs */
+.portal-tabs {
+  display: flex; gap: 2px; background: var(--bg);
+  border-radius: 10px; padding: 3px;
+}
+.portal-tab {
+  border: none; background: transparent; padding: 6px 14px; border-radius: 8px;
+  cursor: pointer; font-size: 13px; font-weight: 600; color: var(--muted);
+  transition: .2s; font-family: inherit; display: flex; align-items: center; gap: 5px;
+  white-space: nowrap;
+}
+.portal-tab:hover { color: var(--ink); background: rgba(255,255,255,.05); }
+.portal-tab.active { background: var(--accent); color: #fff; box-shadow: 0 2px 8px rgba(59,130,246,.4); }
+.portal-tab .tab-icon { font-size: 14px; }
+.portal-tab.disabled { opacity: .4; cursor: not-allowed; }
+.portal-tab.disabled:hover { background: transparent; color: var(--muted); }
+
+/* Portal info */
+.portal-info { margin-left: auto; display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--muted); }
+.portal-info .info-badge { background: var(--bg2); padding: 4px 12px; border-radius: 20px; font-weight: 600; }
+.portal-info .info-badge .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent2); margin-right: 5px; animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+/* Back button */
+.back-btn {
+  background: var(--bg3); border: none; color: var(--ink);
+  padding: 4px 12px; border-radius: 8px; cursor: pointer;
+  font-size: 12px; font-weight: 600; font-family: inherit;
+  transition: .2s; display: flex; align-items: center; gap: 4px;
+  white-space: nowrap;
+}
+.back-btn:hover { background: var(--accent); }
+.back-btn.hidden { display: none; }
+
+/* ===== Content Area ===== */
+.portal-content { position: relative; flex: 1; overflow: hidden; background: var(--bg); }
+.portal-content iframe {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  border: none; background: var(--bg);
+  transition: opacity .25s;
+}
+.portal-content iframe.hidden { opacity: 0; pointer-events: none; z-index: 0; }
+.portal-content iframe.visible { opacity: 1; z-index: 1; }
+
+/* ===== Future Placeholder ===== */
+.future-placeholder {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg); overflow-y: auto; padding: 40px;
+  z-index: 0; opacity: 0; pointer-events: none;
+  transition: opacity .25s;
+}
+.future-placeholder.visible { opacity: 1; pointer-events: auto; z-index: 2; }
+.future-content { max-width: 800px; text-align: center; }
+.future-content h2 { font-size: 24px; font-weight: 800; margin-bottom: 8px; }
+.future-content > p { color: var(--muted); font-size: 14px; margin-bottom: 30px; }
+.future-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+.future-card {
+  background: var(--bg2); border: 1px solid var(--rule); border-radius: 12px;
+  padding: 24px 20px; text-align: left; transition: .2s; position: relative; overflow: hidden;
+}
+.future-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: linear-gradient(90deg, var(--accent), var(--accent2)); opacity: 0; transition: .2s;
+}
+.future-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+.future-card:hover::before { opacity: 1; }
+.future-card .future-icon { font-size: 32px; margin-bottom: 12px; }
+.future-card h3 { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+.future-card p { font-size: 12px; color: var(--muted); line-height: 1.5; }
+.future-card .coming-soon {
+  position: absolute; top: 12px; right: 12px;
+  font-size: 10px; padding: 2px 8px; border-radius: 10px;
+  background: rgba(245,158,11,.15); color: var(--warning); font-weight: 600;
+}
+
+/* ===== Toast ===== */
+.toast {
+  position: fixed; bottom: 20px; left: 50%;
+  transform: translateX(-50%) translateY(100px);
+  background: var(--bg2); border: 1px solid var(--accent); border-radius: 12px;
+  padding: 10px 20px; font-size: 13px; font-weight: 600; color: var(--ink);
+  box-shadow: 0 4px 20px rgba(0,0,0,.4); z-index: 99999;
+  transition: transform .3s cubic-bezier(.4,0,.2,1); pointer-events: none;
+  display: flex; align-items: center; gap: 8px; max-width: 90vw;
+  white-space: nowrap;
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+.toast .toast-icon { font-size: 16px; flex-shrink: 0; }
+
+/* ===== Loading Overlay ===== */
+.loading-overlay {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  background: var(--bg); display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  z-index: 50; transition: opacity .3s; gap: 16px;
+}
+.loading-overlay.hidden { opacity: 0; pointer-events: none; }
+.loading-spinner {
+  width: 40px; height: 40px; border: 3px solid var(--bg3); border-top-color: var(--accent);
+  border-radius: 50%; animation: spin .8s linear infinite;
+}
+.loading-text { font-size: 13px; color: var(--muted); }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ===== Responsive ===== */
+@media (max-width: 768px) {
+  .portal-brand .brand-text { display: none; }
+  .portal-tab { padding: 6px 8px; font-size: 11px; }
+  .portal-tab .tab-icon { font-size: 12px; }
+  .portal-info { display: none; }
+  .future-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- ===== Portal Header ===== -->
+<div class="portal-header">
+  <div class="portal-brand">
+    <img src="logo.png" class="brand-icon" alt="logo">
+    <span class="brand-text">财富500强综合分析平台（WZJ©）</span>
+  </div>
+  <div class="portal-tabs" id="portalTabs">
+    <button class="portal-tab active" data-view="scatter"><span class="tab-icon">📍</span>散点定位</button>
+    <button class="portal-tab" data-view="sankey"><span class="tab-icon">💰</span>收入利润详细</button>
+    <button class="portal-tab" data-view="supplychain"><span class="tab-icon">🔗</span>供应链</button>
+    <button class="portal-tab disabled" data-view="future"><span class="tab-icon">✨</span>更多功能</button>
+  </div>
+  <div class="portal-info">
+    <button class="back-btn hidden" id="backBtn">← 返回散点图</button>
+    <span class="info-badge" id="portalInfo"><span class="dot"></span>加载中…</span>
+  </div>
+</div>
+
+<!-- ===== Content Area ===== -->
+<div class="portal-content">
+  <iframe id="scatterFrame" src="scatter-analysis/scatter-ranking.html" class="visible"></iframe>
+  <iframe id="sankeyFrame" src="income-sankey/index.html" class="hidden"></iframe>
+  <div id="futurePlaceholder" class="future-placeholder">
+    <div class="future-content">
+      <h2>✨ 更多功能即将上线</h2>
+      <p>以下分析模块正在开发中，敬请期待：</p>
+      <div class="future-grid">
+        <div class="future-card">
+          <span class="coming-soon">规划中</span>
+          <div class="future-icon">📊</div>
+          <h3>行业对比分析</h3>
+          <p>多维度行业横向对比，发现竞争格局与行业趋势</p>
+        </div>
+        <div class="future-card">
+          <span class="coming-soon">规划中</span>
+          <div class="future-icon">🎯</div>
+          <h3>企业对标雷达</h3>
+          <p>关键财务指标雷达图，快速定位企业优劣势</p>
+        </div>
+        <div class="future-card">
+          <span class="coming-soon">规划中</span>
+          <div class="future-icon">📈</div>
+          <h3>趋势预测</h3>
+          <p>基于历史数据的营收利润趋势预测与情景分析</p>
+        </div>
+        <div class="future-card">
+          <span class="coming-soon">规划中</span>
+          <div class="future-icon">🌱</div>
+          <h3>ESG综合评估</h3>
+          <p>环境、社会、治理三维ESG评分与风险预警体系</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">正在加载分析平台…</div>
+  </div>
+</div>
+
+<!-- ===== Toast ===== -->
+<div class="toast" id="toast"></div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ===== State =====
+  var currentView = 'scatter';
+  var selectedCompany = null;
+  var currentYear = '2026';
+  var syncingYear = false;
+  var scatterReady = false;
+  var sankeyReady = false;
+  var bridgeInjected = { scatter: false, sankey: false };
+
+  // ===== DOM =====
+  var scatterFrame = document.getElementById('scatterFrame');
+  var sankeyFrame = document.getElementById('sankeyFrame');
+  var futurePlaceholder = document.getElementById('futurePlaceholder');
+  var backBtn = document.getElementById('backBtn');
+  var toast = document.getElementById('toast');
+  var loadingOverlay = document.getElementById('loadingOverlay');
+  var portalInfo = document.getElementById('portalInfo');
+
+  // ===== Toast =====
+  var toastTimer = null;
+  function showToast(msg, icon) {
+    toast.innerHTML = '<span class="toast-icon">' + (icon || '✓') + '</span><span>' + msg + '</span>';
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function() { toast.classList.remove('show'); }, 3000);
+  }
+
+  // ===== View Switching =====
+  function switchView(view) {
+    if (view === currentView) return;
+    currentView = view;
+
+    // Update tabs
+    document.querySelectorAll('.portal-tab').forEach(function(t) {
+      t.classList.toggle('active', t.dataset.view === view);
+    });
+
+    // Show/hide iframes with opacity transition
+    scatterFrame.classList.remove('visible');
+    scatterFrame.classList.toggle('hidden', view !== 'scatter');
+    if (view === 'scatter') { scatterFrame.classList.add('visible'); }
+
+    sankeyFrame.classList.remove('visible');
+    sankeyFrame.classList.toggle('hidden', view !== 'sankey' && view !== 'supplychain');
+    if (view === 'sankey' || view === 'supplychain') { sankeyFrame.classList.add('visible'); }
+
+    futurePlaceholder.classList.toggle('visible', view === 'future');
+
+    // Handle sankey sub-tabs
+    if (view === 'sankey' && sankeyReady) {
+      try { sankeyFrame.contentWindow.postMessage({ type: 'switchTab', tab: 'overview' }, '*'); } catch(e) {}
+    } else if (view === 'supplychain' && sankeyReady) {
+      try { sankeyFrame.contentWindow.postMessage({ type: 'switchTab', tab: 'supplychain' }, '*'); } catch(e) {}
+    }
+
+    // Resize charts after switch — multiple attempts to ensure it works
+    var targetFrame = (view === 'scatter') ? scatterFrame : sankeyFrame;
+    [50, 200, 400].forEach(function(delay) {
+      setTimeout(function() {
+        if (targetFrame.contentWindow) {
+          try { targetFrame.contentWindow.dispatchEvent(new Event('resize')); } catch(e) {}
+          // Also try calling chart resize directly
+          try {
+            if (view === 'scatter' && targetFrame.contentWindow.chart) {
+              targetFrame.contentWindow.chart.resize();
+            }
+          } catch(e) {}
+        }
+      }, delay);
+    });
+
+    // Update back button
+    backBtn.classList.toggle('hidden', view === 'scatter' || view === 'future');
+
+    // Update portal info badge
+    var viewNames = { scatter: '散点定位', sankey: '收入利润详细', supplychain: '供应链', future: '更多功能' };
+    if (view !== 'scatter' && view !== 'future' && selectedCompany) {
+      portalInfo.innerHTML = '<span class="dot"></span>' + selectedCompany + ' · ' + viewNames[view];
+    } else {
+      portalInfo.innerHTML = '<span class="dot"></span>' + viewNames[view];
+    }
+  }
+
+  // ===== Tab Click Handler =====
+  document.getElementById('portalTabs').addEventListener('click', function(e) {
+    var tab = e.target.closest('.portal-tab');
+    if (!tab || tab.classList.contains('disabled')) return;
+    switchView(tab.dataset.view);
+  });
+
+  // ===== Back Button =====
+  backBtn.addEventListener('click', function() { switchView('scatter'); });
+
+  // ===== Inject Scatter Bridge =====
+  // Scatter page now handles its own button and postMessage internally.
+  // We just mark it as ready when the iframe loads.
+  function injectScatterBridge() {
+    if (bridgeInjected.scatter) return;
+    var doc = scatterFrame.contentDocument;
+    if (!doc || !doc.body || doc.readyState !== 'complete') {
+      setTimeout(injectScatterBridge, 300);
+      return;
+    }
+    bridgeInjected.scatter = true;
+    scatterReady = true;
+    checkReady();
+  }
+
+  // ===== Inject Sankey Bridge =====
+  function injectSankeyBridge() {
+    if (bridgeInjected.sankey) return;
+    var doc = sankeyFrame.contentDocument;
+    if (!doc || !doc.body || doc.readyState !== 'complete') {
+      setTimeout(injectSankeyBridge, 300);
+      return;
+    }
+
+    var script = doc.createElement('script');
+    script.textContent =
+      '(function() {' +
+      '  window.addEventListener("message", function(e) {' +
+      '    if (e.data.type === "loadCompany") {' +
+      '      var input = document.getElementById("searchInput");' +
+      '      if (input) {' +
+      '        input.value = e.data.company;' +
+      '        var sug = document.getElementById("suggestions");' +
+      '        if (sug) sug.classList.remove("show");' +
+      '      }' +
+      '      if (typeof renderChart === "function") renderChart(e.data.company);' +
+      '    }' +
+      '    if (e.data.type === "setYear") {' +
+      '      var yb = document.querySelector(".year-btn[data-year=\\"" + e.data.year + "\\"]");' +
+      '      if (yb) yb.click();' +
+      '    }' +
+      '    if (e.data.type === "switchTab") {' +
+      '      var tb = document.querySelector(".tab-btn[data-tab=\\"" + e.data.tab + "\\"]");' +
+      '      if (tb) tb.click();' +
+      '    }' +
+      '  });' +
+      '  var input = document.getElementById("searchInput");' +
+      '  if (input) {' +
+      '    var lastCo = "";' +
+      '    setInterval(function() {' +
+      '      if (input.value !== lastCo && input.value) {' +
+      '        lastCo = input.value;' +
+      '        window.parent.postMessage({ type: "companyChanged", company: input.value, source: "sankey" }, "*");' +
+      '      }' +
+      '    }, 500);' +
+      '  }' +
+      '  var ys = document.getElementById("yearSelector");' +
+      '  if (ys) ys.addEventListener("click", function(e) {' +
+      '    var yb = e.target.closest(".year-btn");' +
+      '    if (yb) setTimeout(function() {' +
+      '      window.parent.postMessage({ type: "yearChanged", year: yb.dataset.year, source: "sankey" }, "*");' +
+      '    }, 50);' +
+      '  }, true);' +
+      '})();';
+    doc.body.appendChild(script);
+    bridgeInjected.sankey = true;
+    sankeyReady = true;
+    checkReady();
+  }
+
+  // ===== Check Ready =====
+  function checkReady() {
+    if (scatterReady && sankeyReady) {
+      loadingOverlay.classList.add('hidden');
+      portalInfo.innerHTML = '<span class="dot"></span>散点定位';
+      setTimeout(function() {
+        showToast('平台已就绪，点击散点图中的企业可查看深度分析', '🚀');
+      }, 500);
+    }
+  }
+
+  // ===== Iframe Load Handlers =====
+  scatterFrame.addEventListener('load', function() {
+    setTimeout(injectScatterBridge, 500);
+  });
+  sankeyFrame.addEventListener('load', function() {
+    setTimeout(injectSankeyBridge, 500);
+  });
+
+  // ===== Message Handler =====
+  window.addEventListener('message', function(e) {
+    var data = e.data;
+    if (!data || !data.type) return;
+
+    // Company selected from scatter → switch to sankey
+    if (data.type === 'companySelected') {
+      selectedCompany = data.company;
+      switchView('sankey');
+      // Wait for view switch, then load company
+      setTimeout(function() {
+        try { sankeyFrame.contentWindow.postMessage({ type: 'loadCompany', company: data.company }, '*'); } catch(err) {}
+      }, 300);
+      showToast('已加载 ' + data.company + ' 的收入利润详细数据', '📊');
+    }
+
+    // Company changed in sankey → update state
+    if (data.type === 'companyChanged' && data.source === 'sankey') {
+      selectedCompany = data.company;
+      if (currentView === 'sankey' || currentView === 'supplychain') {
+        portalInfo.innerHTML = '<span class="dot"></span>' + data.company;
+      }
+    }
+
+    // Year changed → sync to other iframe
+    if (data.type === 'yearChanged') {
+      currentYear = data.year;
+      if (!syncingYear) {
+        syncingYear = true;
+        if (data.source === 'scatter' && sankeyReady) {
+          try { sankeyFrame.contentWindow.postMessage({ type: 'setYear', year: data.year }, '*'); } catch(err) {}
+        } else if (data.source === 'sankey' && scatterReady) {
+          try { scatterFrame.contentWindow.postMessage({ type: 'setYear', year: data.year }, '*'); } catch(err) {}
+        }
+        setTimeout(function() { syncingYear = false; }, 600);
+      }
+    }
+  });
+
+  // ===== Init =====
+  portalInfo.innerHTML = '<span class="dot"></span>加载中…';
+
+  // Safety timeout — hide loading after 8s even if iframes are slow
+  setTimeout(function() {
+    if (!loadingOverlay.classList.contains('hidden')) {
+      loadingOverlay.classList.add('hidden');
+      portalInfo.innerHTML = '<span class="dot"></span>散点定位';
+      showToast('平台已就绪', '🚀');
+    }
+  }, 8000);
+})();
+</script>
+</body>
+</html>
